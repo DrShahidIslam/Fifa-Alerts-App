@@ -198,7 +198,7 @@ def detect_spikes(all_stories, trends_data=None):
         score, factors = _calculate_spike_score(cluster_stories, conn)
 
         # Only report clusters with meaningful score
-        if score >= 20:  # Minimum threshold
+        if score >= 15:  # Minimum threshold (single source = 15 points)
             # Pick the best title (longest, most descriptive)
             best_story = max(cluster_stories, key=lambda s: len(s["title"]))
 

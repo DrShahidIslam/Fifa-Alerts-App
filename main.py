@@ -112,6 +112,13 @@ def run_scan():
 
     if not trending_topics:
         logger.info("✅ No new trending topics detected this cycle.")
+        # Always send a scan summary so user knows the agent is working
+        send_simple_message(
+            f"📊 Scan complete ({datetime.now().strftime('%H:%M UTC')})\n"
+            f"Stories found: {len(all_stories)}\n"
+            f"Trending topics: 0\n"
+            f"No alerts this cycle — all quiet."
+        )
         return 0
 
     logger.info(f"🔥 Found {len(trending_topics)} trending topics!")
