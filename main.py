@@ -38,6 +38,7 @@ _latest_topics = []       # Most recent trending topics from last scan
 _pending_article = None   # Article awaiting approval
 _update_offset = None     # Telegram getUpdates offset
 _gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
+_article_attempted_this_run = False  # Limit to one article generation per --once run
 
 # ── Logging Setup ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -54,21 +55,6 @@ logging.basicConfig(
 logger = logging.getLogger("FIFANewsAgent")
 
 
-def _drain_stale_updates():
-    """
-    Drain all pending Telegram updates so we don't re-process
-    stale callback queries from previous runs.
-    Each GitHub Actions run is a fresh process (_update_offset resets to None),
-    so without this, old 'write_article' button presses get re-triggered.
-    """
-    global _update_offset
-    updates = get_updates(offset=_update_offset)
-    if updates:
-        # Set offset past all existing updates so they won't be fetched again
-        _update_offset = updates[-1]["update_id"] + 1
-        logger.info(f"🧹 Drained {len(updates)} stale Telegram update(s)")
-
-
 def run_scan():
     """
     Execute a single scan cycle:
@@ -76,9 +62,6 @@ def run_scan():
     2. Detect spikes
     3. Send Telegram alerts for trending topics
     """
-    # Drain any stale Telegram callbacks from previous runs first
-    _drain_stale_updates()
-
     logger.info("=" * 60)
     logger.info(f"🔍 Starting scan at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
@@ -246,7 +229,13 @@ def check_and_handle_commands():
 
 def _handle_write_article():
     """Generate an article from the most recent trending topic."""
-    global _pending_article, _latest_topics, _gemini_quota_exhausted
+    global _pending_article, _latest_topics, _gemini_quota_exhausted, _article_attempted_this_run
+
+    # Only allow one article generation attempt per --once run
+    # This prevents multiple stale callbacks from triggering repeated failures
+    if _article_attempted_this_run:
+        logger.info("⏭️ Skipping duplicate write_article — already attempted this run")
+        return
 
     # Don't attempt generation if we already know the quota is exhausted
     if _gemini_quota_exhausted:
@@ -257,6 +246,8 @@ def _handle_write_article():
     if not _latest_topics:
         send_simple_message("⚠️ No trending topics available. Wait for the next scan.")
         return
+
+    _article_attempted_this_run = True  # Mark as attempted before trying
 
     topic = _latest_topics[0]  # Use the highest-scored topic
     logger.info(f"📝 Generating article for: {topic['topic']}")
