@@ -9,6 +9,13 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+# Domains that should never be scraped (they block bots or return non-article content)
+BLOCKED_DOMAINS = {
+    "trends.google.com",
+    "www.google.com",
+    "google.com",
+}
+
 # Request headers to avoid blocks
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -29,6 +36,11 @@ def fetch_article_text(url, max_chars=3000):
         return None
 
     domain = urlparse(url).netloc.replace("www.", "")
+
+    # Skip blocked domains that can't be scraped
+    if domain in BLOCKED_DOMAINS or urlparse(url).netloc in BLOCKED_DOMAINS:
+        logger.debug(f"  ⏭️ Skipping blocked domain: {domain}")
+        return None
 
     # Try trafilatura first (best quality extraction)
     try:

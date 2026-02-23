@@ -4,6 +4,7 @@ from source material gathered by the source fetcher.
 """
 import logging
 import re
+import time
 
 from google import genai
 
@@ -15,6 +16,49 @@ from writer.source_fetcher import fetch_multiple_sources
 from writer.seo_prompt import build_article_prompt
 
 logger = logging.getLogger(__name__)
+
+# Retry configuration for Gemini API
+GEMINI_MAX_RETRIES = 3
+GEMINI_BASE_DELAY = 20  # seconds
+
+
+def _call_gemini_with_retry(client, prompt, max_retries=GEMINI_MAX_RETRIES, base_delay=GEMINI_BASE_DELAY):
+    """
+    Call Gemini API with exponential backoff on 429/RESOURCE_EXHAUSTED errors.
+
+    Returns:
+        str: The generated text response
+    Raises:
+        Exception: If all retries are exhausted or a non-retryable error occurs
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=config.GEMINI_MODEL,
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            error_str = str(e)
+            is_rate_limit = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+
+            if not is_rate_limit:
+                raise  # Non-retryable error, raise immediately
+
+            if attempt >= max_retries:
+                logger.error(f"  ❌ Gemini API exhausted all {max_retries} retries")
+                raise
+
+            # Try to parse retry delay from error message (e.g., "Please retry in 18.5s")
+            delay = base_delay * (2 ** attempt)  # exponential backoff
+            retry_match = re.search(r'retry in ([\d.]+)s', error_str)
+            if retry_match:
+                parsed_delay = float(retry_match.group(1))
+                delay = max(delay, parsed_delay + 2)  # Use whichever is longer, plus buffer
+
+            logger.warning(f"  ⏳ Gemini rate limited (attempt {attempt + 1}/{max_retries}). "
+                           f"Waiting {delay:.0f}s before retry...")
+            time.sleep(delay)
 
 
 def generate_article(topic, source_urls=None):
@@ -66,15 +110,11 @@ def generate_article(topic, source_urls=None):
         matched_keyword=topic.get("matched_keyword", "")
     )
 
-    # ── Step 3: Call Gemini ───────────────────────────────────────
+    # ── Step 3: Call Gemini (with retry) ──────────────────────────
     try:
         logger.info("  🤖 Calling Gemini API...")
         client = genai.Client(api_key=config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents=prompt,
-        )
-        raw_output = response.text
+        raw_output = _call_gemini_with_retry(client, prompt)
         logger.info(f"  ✅ Gemini responded ({len(raw_output)} chars)")
 
     except Exception as e:

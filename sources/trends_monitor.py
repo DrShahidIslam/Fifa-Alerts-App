@@ -71,11 +71,11 @@ def fetch_trending_queries():
                                 logger.info(f"  🔥 RISING: '{keyword}' — {current} vs avg {avg_overall:.0f} ({current/max(avg_overall,1):.1f}x)")
 
             # Rate limit — be polite to Google
-            time.sleep(2)
+            time.sleep(5)
 
         except Exception as e:
             logger.warning(f"Google Trends error for batch {batch}: {e}")
-            time.sleep(5)
+            time.sleep(10)
             continue
 
     # Also check related rising queries for top keywords
