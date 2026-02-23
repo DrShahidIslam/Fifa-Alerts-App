@@ -100,16 +100,14 @@ def fetch_news_headlines():
     except Exception as e:
         logger.error(f"NewsAPI sports headlines error: {e}")
 
-    # ── Query 2: Everything endpoint for broader coverage ───────────
+    # ── Query 2: Everything endpoint for broader WC coverage ──────────
     search_queries = [
         "FIFA World Cup 2026",
         "football world cup 2026",
         "World Cup qualifier 2026",
         "World Cup 2026 tickets",
-        "football transfer",
-        "Champions League",
-        "Premier League",
-        "soccer",
+        "World Cup 2026 venue",
+        "World Cup 2026 draw",
     ]
 
     for query in search_queries:

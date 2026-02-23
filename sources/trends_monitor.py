@@ -89,6 +89,18 @@ def fetch_trending_queries():
                 for _, row in rising_df.head(10).iterrows():
                     query = row.get("query", "")
                     value = row.get("value", 0)
+
+                    # Skip queries with excluded keywords (cricket, T20, etc.)
+                    query_lower = query.lower()
+                    excluded = False
+                    for ex_kw in getattr(config, "EXCLUDE_KEYWORDS", []):
+                        if ex_kw.lower() in query_lower:
+                            logger.debug(f"  ⏭️ Skipping excluded trend: '{query}' (matched: {ex_kw})")
+                            excluded = True
+                            break
+                    if excluded:
+                        continue
+
                     trends.append({
                         "keyword": query,
                         "current_interest": int(value) if isinstance(value, (int, float)) else 0,

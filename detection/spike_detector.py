@@ -125,6 +125,15 @@ def _calculate_spike_score(cluster_stories, conn):
     return round(score, 1), factors
 
 
+def _is_excluded(text):
+    """Check if text contains any exclusion keywords (cricket, rugby, etc.)."""
+    text_lower = text.lower()
+    for kw in getattr(config, "EXCLUDE_KEYWORDS", []):
+        if kw.lower() in text_lower:
+            return True
+    return False
+
+
 def detect_spikes(all_stories, trends_data=None):
     """
     Main detection function.
@@ -164,6 +173,21 @@ def detect_spikes(all_stories, trends_data=None):
                     "is_rising": True,
                 })
 
+    # ── Relevance filter: remove stories with excluded keywords ───
+    filtered = []
+    excluded_count = 0
+    for story in combined:
+        title = story.get("title", "")
+        keyword = story.get("matched_keyword", "")
+        if _is_excluded(title) or _is_excluded(keyword):
+            excluded_count += 1
+            continue
+        filtered.append(story)
+
+    if excluded_count > 0:
+        logger.info(f"Spike Detector: Excluded {excluded_count} irrelevant stories (cricket/rugby/etc.)")
+    combined = filtered
+
     # Filter out already-seen stories
     new_stories = []
     for story in combined:
@@ -194,11 +218,12 @@ def detect_spikes(all_stories, trends_data=None):
 
     # Score each cluster
     trending_topics = []
+    min_score = getattr(config, "SPIKE_MIN_SCORE", 40)
     for cluster_key, cluster_stories in clusters.items():
         score, factors = _calculate_spike_score(cluster_stories, conn)
 
         # Only report clusters with meaningful score
-        if score >= 15:  # Minimum threshold (single source = 15 points)
+        if score >= min_score:
             # Pick the best title (longest, most descriptive)
             best_story = max(cluster_stories, key=lambda s: len(s["title"]))
 

@@ -29,10 +29,10 @@ RSS_FEEDS = {
 
 # ── General Football Mode ────────────────────────────────────────────
 # When True, football-specific RSS feeds pass ALL stories without keyword
-# filtering (since they already only contain football content).
-GENERAL_FOOTBALL_MODE = True
+# filtering. Set to False for strict FIFA 2026 World Cup focus.
+GENERAL_FOOTBALL_MODE = False
 
-# RSS feeds that are football-only (all stories are relevant when general mode is on)
+# RSS feeds that are football-only (only used when general mode is on)
 FOOTBALL_ONLY_FEEDS = [
     "ESPN FIFA", "BBC Sport Football", "FOX Sports",
     "The Guardian Football", "Sky Sports Football",
@@ -52,7 +52,8 @@ PRIMARY_KEYWORDS = [
     "wc 2026", "wc2026",
 ]
 
-# General football keywords — catch all major football news
+# General football keywords — KEPT for reference but NOT included in ALL_KEYWORDS
+# to maintain strict FIFA 2026 focus. Re-add to ALL_KEYWORDS if you want broader coverage.
 GENERAL_FOOTBALL_KEYWORDS = [
     "football", "soccer",
     "champions league", "europa league", "conference league",
@@ -67,7 +68,15 @@ GENERAL_FOOTBALL_KEYWORDS = [
     "var", "offside", "golden boot", "ballon d'or",
 ]
 
-# Team keywords — all qualified + playoff teams
+# Exclusion keywords — stories/trends containing these are discarded
+EXCLUDE_KEYWORDS = [
+    "t20", "cricket", "ipl", "odi", "test match",
+    "rugby", "nfl", "nba", "baseball", "mlb",
+    "tennis", "f1", "formula 1", "golf", "boxing", "ufc", "mma",
+    "hockey", "nhl", "kabaddi",
+]
+
+# Team keywords — national teams only (no clubs to avoid league noise)
 TEAM_KEYWORDS = [
     # Host nations
     "usa soccer", "us men's national team", "usmnt",
@@ -85,11 +94,6 @@ TEAM_KEYWORDS = [
     "new zealand", "jamaica", "costa rica",
     "bolivia", "suriname", "new caledonia",
     "bosnia", "northern ireland", "georgia", "iceland",
-    # Top clubs (drive major news)
-    "real madrid", "barcelona", "manchester united", "manchester city",
-    "liverpool", "chelsea", "arsenal", "bayern munich",
-    "psg", "paris saint-germain", "juventus", "inter milan",
-    "ac milan", "atletico madrid", "borussia dortmund",
 ]
 
 # Player keywords — stars fans search for (no "world cup" suffix needed)
@@ -123,14 +127,15 @@ LOGISTICS_KEYWORDS = [
     "world cup bracket", "world cup wall chart",
 ]
 
-# Combined master list for filtering
+# Combined master list for filtering (GENERAL_FOOTBALL_KEYWORDS excluded for strict WC focus)
 ALL_KEYWORDS = (
-    PRIMARY_KEYWORDS + GENERAL_FOOTBALL_KEYWORDS + TEAM_KEYWORDS +
+    PRIMARY_KEYWORDS + TEAM_KEYWORDS +
     PLAYER_KEYWORDS + VENUE_KEYWORDS + LOGISTICS_KEYWORDS
 )
 
 # ── Detection Settings ────────────────────────────────────────────────
 SPIKE_THRESHOLD = 2.0           # 2x above the rolling average = spike
+SPIKE_MIN_SCORE = 40            # Minimum spike score to trigger alert (was 15)
 ROLLING_WINDOW_HOURS = 24       # Baseline window for comparison
 SCAN_INTERVAL_MINUTES = 30      # How often the agent scans
 DEDUP_WINDOW_HOURS = 168        # Don't re-alert about the same story within 7 days
