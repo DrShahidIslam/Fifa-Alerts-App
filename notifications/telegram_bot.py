@@ -27,11 +27,8 @@ def _get_base_url():
 def send_trending_alert(topic):
     """
     Send a rich trending topic alert to Telegram.
-
-    Args:
-        topic: dict with keys: topic, score, factors, sources, top_url, story_count, matched_keyword
+    Uses plain text to avoid MarkdownV2 escaping issues with dynamic content.
     """
-    # Build the message
     score = topic.get("score", 0)
     factors = topic.get("factors", [])
     sources = topic.get("sources", [])
@@ -46,38 +43,38 @@ def send_trending_alert(topic):
     else:
         fire = "🔥"
 
-    message = f"""{fire} *TRENDING: {_escape_md(topic['topic'])}*
-{'━' * 30}
-📊 *Score:* {score} \\| {story_count} source{'s' if story_count > 1 else ''}
-📰 *Sources:* {_escape_md(', '.join(sources[:5]))}
-🏷️ *Keyword:* {_escape_md(topic.get('matched_keyword', 'N/A'))}
+    lines = [
+        f"{fire} TRENDING: {topic['topic']}",
+        "━" * 30,
+        f"📊 Score: {score} | {story_count} source{'s' if story_count > 1 else ''}",
+        f"📰 Sources: {', '.join(sources[:5])}",
+        f"🏷️ Keyword: {topic.get('matched_keyword', 'N/A')}",
+        "",
+        "📝 Why it's trending:",
+    ]
 
-📝 *Why it's trending:*
-{_format_factors(factors)}
-"""
+    for f in factors[:5]:
+        lines.append(f"  • {f}")
 
     if top_url:
-        message += f"\n🔗 [Read source article]({top_url})\n"
+        lines.append(f"\n🔗 Source: {top_url}")
 
-    # Add story summaries if available
+    # Add story summaries
     stories = topic.get("stories", [])
     if stories:
-        message += f"\n📰 *Coverage:*\n"
+        lines.append("\n📰 Coverage:")
         for s in stories[:3]:
             source_name = s.get("source", "Unknown")
-            title = _escape_md(s.get("title", "")[:80])
+            title = s.get("title", "")[:80]
             url = s.get("url", "")
+            lines.append(f"  • [{source_name}] {title}")
             if url:
-                message += f"• [{title}]({url}) _\\({_escape_md(source_name)}\\)_\n"
-            else:
-                message += f"• {title} _\\({_escape_md(source_name)}\\)_\n"
+                lines.append(f"    {url}")
 
-    message += f"""
-⚡ *Actions:*
-/write\\_article \\- Generate draft article
-/ignore \\- Skip this topic"""
+    lines.append("\n⚡ Reply /write_article to generate a draft")
 
-    return _send_message(message, parse_mode="MarkdownV2")
+    message = "\n".join(lines)
+    return _send_message(message)
 
 
 def send_simple_message(text):
@@ -87,8 +84,8 @@ def send_simple_message(text):
 
 def send_status_update(status_text):
     """Send a status update about the agent's activity."""
-    message = f"🤖 *Agent Status*\n{'━' * 20}\n{_escape_md(status_text)}"
-    return _send_message(message, parse_mode="MarkdownV2")
+    message = f"🤖 Agent Status\n{'━' * 20}\n{status_text}"
+    return _send_message(message)
 
 
 def send_article_preview(article_data):
