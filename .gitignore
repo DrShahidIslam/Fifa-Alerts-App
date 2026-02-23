@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+*.db
+*.log
+.venv/
+venv/
+images/
+test_output.txt
+test_results.log
+deploy/*.key
+fifa_agent.db

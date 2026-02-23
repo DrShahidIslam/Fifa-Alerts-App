@@ -1,0 +1,19 @@
+[Unit]
+Description=FIFA World Cup 2026 News Agent
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/fifa-agent
+Environment=PYTHONIOENCODING=utf-8
+ExecStart=/opt/fifa-agent/venv/bin/python main.py
+Restart=always
+RestartSec=60
+
+# Logging
+StandardOutput=append:/opt/fifa-agent/logs/agent.log
+StandardError=append:/opt/fifa-agent/logs/agent_error.log
+
+[Install]
+WantedBy=multi-user.target
