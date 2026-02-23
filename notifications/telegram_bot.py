@@ -13,8 +13,15 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Telegram API base URL
-BASE_URL = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}"
+
+def _get_base_url():
+    """Build Telegram API URL at call time (not import time) so env vars are loaded."""
+    token = config.TELEGRAM_BOT_TOKEN
+    if not token:
+        print("ERROR: TELEGRAM_BOT_TOKEN is not set!")
+        logger.error("TELEGRAM_BOT_TOKEN is not set!")
+        return None
+    return f"https://api.telegram.org/bot{token}"
 
 
 def send_trending_alert(topic):
@@ -149,8 +156,18 @@ def _escape_md(text):
 
 def _send_message(text, parse_mode=None):
     """Send a message via Telegram Bot API."""
+    base_url = _get_base_url()
+    if not base_url:
+        print("TELEGRAM ERROR: Cannot send message — bot token not configured")
+        return None
+
+    chat_id = config.TELEGRAM_CHAT_ID
+    if not chat_id:
+        print("TELEGRAM ERROR: Cannot send message — chat ID not configured")
+        return None
+
     payload = {
-        "chat_id": config.TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "disable_web_page_preview": False,
     }
@@ -158,21 +175,22 @@ def _send_message(text, parse_mode=None):
         payload["parse_mode"] = parse_mode
 
     try:
-        response = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=15)
+        response = requests.post(f"{base_url}/sendMessage", json=payload, timeout=15)
         result = response.json()
 
         if result.get("ok"):
             message_id = result["result"]["message_id"]
             logger.info(f"Telegram: Message sent (ID: {message_id})")
+            print(f"TELEGRAM OK: Message sent (ID: {message_id})")
             return message_id
         else:
             error_desc = result.get("description", "Unknown error")
             logger.error(f"Telegram API error: {error_desc}")
+            print(f"TELEGRAM API ERROR: {error_desc}")
 
             # If MarkdownV2 fails, retry without formatting
             if parse_mode and "parse" in error_desc.lower():
                 logger.info("Retrying without markdown formatting...")
-                # Strip markdown for plain text retry
                 import re
                 plain_text = re.sub(r'\\(.)', r'\1', text)
                 plain_text = re.sub(r'\*([^*]+)\*', r'\1', plain_text)
@@ -183,9 +201,11 @@ def _send_message(text, parse_mode=None):
 
     except requests.exceptions.Timeout:
         logger.error("Telegram: Request timed out")
+        print("TELEGRAM ERROR: Request timed out")
         return None
     except Exception as e:
         logger.error(f"Telegram send error: {e}")
+        print(f"TELEGRAM ERROR: {e}")
         return None
 
 
@@ -194,12 +214,16 @@ def get_updates(offset=None):
     Get new messages/commands sent to the bot.
     Used for handling /write_article, /approve, /reject commands.
     """
+    base_url = _get_base_url()
+    if not base_url:
+        return []
+
     params = {"timeout": 5}
     if offset:
         params["offset"] = offset
 
     try:
-        response = requests.get(f"{BASE_URL}/getUpdates", params=params, timeout=10)
+        response = requests.get(f"{base_url}/getUpdates", params=params, timeout=10)
         result = response.json()
 
         if result.get("ok"):
@@ -213,8 +237,12 @@ def get_updates(offset=None):
 
 def test_connection():
     """Test the Telegram bot connection."""
+    base_url = _get_base_url()
+    if not base_url:
+        return False, None
+
     try:
-        response = requests.get(f"{BASE_URL}/getMe", timeout=10)
+        response = requests.get(f"{base_url}/getMe", timeout=10)
         result = response.json()
         if result.get("ok"):
             bot_name = result["result"].get("username", "Unknown")
