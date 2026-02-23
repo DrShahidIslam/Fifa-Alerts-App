@@ -139,10 +139,13 @@ def generate_featured_image(article_title, save_dir=None):
 
         # Use Gemini with image generation capability
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash-image",
             contents=prompt,
             config=genai.types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
+                response_modalities=["IMAGE"],
+                image_config=genai.types.ImageConfig(
+                    aspect_ratio="16:9",
+                ),
             ),
         )
 

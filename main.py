@@ -27,15 +27,17 @@ from detection.spike_detector import detect_spikes
 from notifications.telegram_bot import (
     send_trending_alert, send_simple_message, send_status_update,
     send_article_preview, send_publish_confirmation, send_generating_status,
-    get_updates, answer_callback_query, test_connection
+    send_image_preview, get_updates, answer_callback_query, test_connection
 )
 from database.db import get_connection, cleanup_old_data, mark_notified, record_notification
 from writer.article_generator import generate_article
 from publisher.wordpress_client import create_post
+from publisher.image_handler import generate_featured_image
 
 # ── Global state for command handler ──────────────────────────────────
 _latest_topics = []       # Most recent trending topics from last scan
 _pending_article = None   # Article awaiting approval
+_pending_image_path = None  # Featured image awaiting approval
 _update_offset = None     # Telegram getUpdates offset
 _gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
 _article_attempted_this_run = False  # Limit to one article generation per --once run
@@ -179,7 +181,7 @@ def check_and_handle_commands():
       - approve / publish_live (inline button or /approve, /publish_live text)
       - ignore (inline button)
     """
-    global _update_offset, _latest_topics, _pending_article
+    global _update_offset, _latest_topics, _pending_article, _pending_image_path
 
     updates = get_updates(offset=_update_offset)
     if not updates:
@@ -207,7 +209,18 @@ def check_and_handle_commands():
             elif data == "reject":
                 answer_callback_query(callback_id, "🗑️ Article discarded.")
                 _pending_article = None
+                _pending_image_path = None
                 send_simple_message("🗑️ Article discarded.")
+            elif data == "approve_image":
+                answer_callback_query(callback_id, "✅ Image approved!")
+                send_simple_message("✅ Image approved! It will be used as the featured image when you publish.")
+            elif data == "regenerate_image":
+                answer_callback_query(callback_id, "🔄 Regenerating image...")
+                _handle_regenerate_image()
+            elif data == "skip_image":
+                answer_callback_query(callback_id, "🚫 Image skipped.")
+                _pending_image_path = None
+                send_simple_message("🚫 Image skipped. Article will be published without a featured image.")
             elif data == "ignore":
                 answer_callback_query(callback_id, "👍 Ignored.")
             continue
@@ -260,6 +273,8 @@ def _handle_write_article():
             _pending_article = article
             send_article_preview(article)
             logger.info(f"✅ Article preview sent: {article['title']}")
+            # Auto-generate featured image after article is ready
+            _generate_and_preview_image(article.get("title", ""))
         else:
             send_simple_message("❌ Article generation failed. Try again later.")
     except Exception as e:
@@ -273,9 +288,43 @@ def _handle_write_article():
             send_simple_message(f"❌ Error generating article: {error_str[:200]}")
 
 
+def _generate_and_preview_image(article_title):
+    """Generate a featured image and send it to Telegram for approval."""
+    global _pending_image_path
+
+    if not article_title:
+        return
+
+    send_simple_message("🎨 Generating featured image... This may take a moment.")
+
+    try:
+        image_path = generate_featured_image(article_title)
+        if image_path:
+            _pending_image_path = image_path
+            send_image_preview(image_path, article_title)
+            logger.info(f"🖼️ Image preview sent: {image_path}")
+        else:
+            send_simple_message("⚠️ Image generation failed. Article can still be published without an image.")
+    except Exception as e:
+        logger.error(f"Image generation error: {e}")
+        send_simple_message(f"⚠️ Image generation failed: {str(e)[:200]}. Article can still be published without an image.")
+
+
+def _handle_regenerate_image():
+    """Regenerate the featured image for the pending article."""
+    global _pending_image_path
+
+    if not _pending_article:
+        send_simple_message("⚠️ No article pending. Nothing to generate an image for.")
+        return
+
+    _pending_image_path = None
+    _generate_and_preview_image(_pending_article.get("title", ""))
+
+
 def _handle_approve(status="draft"):
     """Publish the pending article to WordPress."""
-    global _pending_article
+    global _pending_article, _pending_image_path
 
     if not _pending_article:
         send_simple_message("⚠️ No article pending approval. Generate one first with ✍️ Write Article.")
@@ -284,11 +333,17 @@ def _handle_approve(status="draft"):
     logger.info(f"📤 Publishing article: {_pending_article['title']} (status: {status})")
 
     try:
-        result = create_post(_pending_article, status=status)
+        result = create_post(
+            _pending_article,
+            featured_image_path=_pending_image_path,
+            status=status,
+        )
         if result:
+            img_note = " (with featured image)" if _pending_image_path else ""
             send_publish_confirmation(result["post_url"], _pending_article["title"])
-            logger.info(f"✅ Published: {result['post_url']}")
+            logger.info(f"✅ Published{img_note}: {result['post_url']}")
             _pending_article = None
+            _pending_image_path = None
         else:
             send_simple_message("❌ WordPress publishing failed. Check your WP credentials.")
     except Exception as e:

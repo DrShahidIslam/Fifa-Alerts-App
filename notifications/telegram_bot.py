@@ -177,6 +177,65 @@ def send_generating_status(topic_title):
     return _send_message(message)
 
 
+def send_image_preview(image_path, article_title):
+    """
+    Send a generated featured image to Telegram for approval.
+
+    Args:
+        image_path: Local path to the image file
+        article_title: Article title for the caption
+
+    Returns:
+        int: Message ID, or None if failed
+    """
+    import json
+
+    base_url = _get_base_url()
+    if not base_url:
+        return None
+
+    chat_id = config.TELEGRAM_CHAT_ID
+    if not chat_id:
+        return None
+
+    caption = f"🖼️ Featured Image Preview\n━━━━━━━━━━━━━━━━━━━━\n{article_title}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Use Image", "callback_data": "approve_image"},
+                {"text": "🔄 Regenerate", "callback_data": "regenerate_image"},
+            ],
+            [
+                {"text": "🚫 Skip Image", "callback_data": "skip_image"},
+            ],
+        ]
+    }
+
+    try:
+        with open(image_path, "rb") as f:
+            files = {"photo": f}
+            data = {
+                "chat_id": chat_id,
+                "caption": caption,
+                "reply_markup": json.dumps(keyboard),
+            }
+            response = requests.post(f"{base_url}/sendPhoto", data=data, files=files, timeout=30)
+
+        result = response.json()
+        if result.get("ok"):
+            message_id = result["result"]["message_id"]
+            logger.info(f"Telegram: Image sent (ID: {message_id})")
+            return message_id
+        else:
+            logger.error(f"Telegram sendPhoto error: {result.get('description', 'Unknown')}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Telegram image send error: {e}")
+        return None
+
+
 def _send_message(text, parse_mode=None, reply_markup=None):
     """Send a message via Telegram Bot API."""
     base_url = _get_base_url()
