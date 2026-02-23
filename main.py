@@ -37,6 +37,7 @@ from publisher.wordpress_client import create_post
 _latest_topics = []       # Most recent trending topics from last scan
 _pending_article = None   # Article awaiting approval
 _update_offset = None     # Telegram getUpdates offset
+_gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
 
 # ── Logging Setup ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -53,6 +54,21 @@ logging.basicConfig(
 logger = logging.getLogger("FIFANewsAgent")
 
 
+def _drain_stale_updates():
+    """
+    Drain all pending Telegram updates so we don't re-process
+    stale callback queries from previous runs.
+    Each GitHub Actions run is a fresh process (_update_offset resets to None),
+    so without this, old 'write_article' button presses get re-triggered.
+    """
+    global _update_offset
+    updates = get_updates(offset=_update_offset)
+    if updates:
+        # Set offset past all existing updates so they won't be fetched again
+        _update_offset = updates[-1]["update_id"] + 1
+        logger.info(f"🧹 Drained {len(updates)} stale Telegram update(s)")
+
+
 def run_scan():
     """
     Execute a single scan cycle:
@@ -60,6 +76,9 @@ def run_scan():
     2. Detect spikes
     3. Send Telegram alerts for trending topics
     """
+    # Drain any stale Telegram callbacks from previous runs first
+    _drain_stale_updates()
+
     logger.info("=" * 60)
     logger.info(f"🔍 Starting scan at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
@@ -227,7 +246,13 @@ def check_and_handle_commands():
 
 def _handle_write_article():
     """Generate an article from the most recent trending topic."""
-    global _pending_article, _latest_topics
+    global _pending_article, _latest_topics, _gemini_quota_exhausted
+
+    # Don't attempt generation if we already know the quota is exhausted
+    if _gemini_quota_exhausted:
+        logger.info("⏸️ Skipping article generation — Gemini quota exhausted this cycle")
+        send_simple_message("⏸️ Gemini API quota exhausted. Article generation paused until next cycle.")
+        return
 
     if not _latest_topics:
         send_simple_message("⚠️ No trending topics available. Wait for the next scan.")
@@ -247,8 +272,14 @@ def _handle_write_article():
         else:
             send_simple_message("❌ Article generation failed. Try again later.")
     except Exception as e:
+        error_str = str(e)
         logger.error(f"Article generation error: {e}")
-        send_simple_message(f"❌ Error generating article: {str(e)[:200]}")
+        # If quota is exhausted, set the flag to prevent further attempts
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            _gemini_quota_exhausted = True
+            send_simple_message("❌ Gemini API quota exhausted. No more article attempts this cycle.")
+        else:
+            send_simple_message(f"❌ Error generating article: {error_str[:200]}")
 
 
 def _handle_approve(status="draft"):

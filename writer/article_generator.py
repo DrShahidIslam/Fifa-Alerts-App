@@ -45,6 +45,12 @@ def _call_gemini_with_retry(client, prompt, max_retries=GEMINI_MAX_RETRIES, base
             if not is_rate_limit:
                 raise  # Non-retryable error, raise immediately
 
+            # Check if this is a DAILY quota exhaustion (limit: 0) vs a per-minute spike.
+            # When limit is 0, retrying is pointless — fail immediately to save time.
+            if "limit: 0" in error_str or "PerDay" in error_str:
+                logger.error(f"  ❌ Gemini daily quota exhausted — retrying won't help")
+                raise
+
             if attempt >= max_retries:
                 logger.error(f"  ❌ Gemini API exhausted all {max_retries} retries")
                 raise
