@@ -71,10 +71,18 @@ def send_trending_alert(topic):
             if url:
                 lines.append(f"    {url}")
 
-    lines.append("\n⚡ Reply /write_article to generate a draft")
-
     message = "\n".join(lines)
-    return _send_message(message)
+
+    # Use inline keyboard buttons for actions
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✍️ Write Article", "callback_data": "write_article"},
+                {"text": "🚫 Ignore", "callback_data": "ignore"},
+            ]
+        ]
+    }
+    return _send_message(message, reply_markup=keyboard)
 
 
 def send_simple_message(text):
@@ -95,30 +103,42 @@ def send_article_preview(article_data):
     Args:
         article_data: dict with title, meta_description, content (first 500 chars), slug
     """
-    title = _escape_md(article_data.get("title", "Untitled"))
-    meta = _escape_md(article_data.get("meta_description", ""))
-    slug = _escape_md(article_data.get("slug", ""))
+    title = article_data.get("title", "Untitled")
+    meta = article_data.get("meta_description", "")
+    slug = article_data.get("slug", "")
     word_count = article_data.get("word_count", 0)
-    content_preview = _escape_md(article_data.get("content", "")[:800])
+    content_preview = article_data.get("content", "")[:800]
 
-    message = f"""📝 *ARTICLE READY FOR REVIEW*
-{'━' * 30}
+    lines = [
+        "📝 ARTICLE READY FOR REVIEW",
+        "━" * 30,
+        "",
+        f"Title: {title}",
+        f"Slug: /{slug}",
+        f"Meta: {meta}",
+        f"Words: {word_count}",
+        "",
+        "Preview:",
+        f"{content_preview}...",
+    ]
 
-*Title:* {title}
-*Slug:* /{slug}
-*Meta:* {meta}
-*Words:* {word_count}
+    message = "\n".join(lines)
 
-*Preview:*
-{content_preview}\\.\\.\\. 
+    # Inline buttons for approve/reject
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Approve (Draft)", "callback_data": "approve"},
+                {"text": "🚀 Publish Live", "callback_data": "publish_live"},
+            ],
+            [
+                {"text": "🔄 Regenerate", "callback_data": "write_article"},
+                {"text": "🗑️ Reject", "callback_data": "reject"},
+            ],
+        ]
+    }
 
-⚡ *Actions:*
-/approve \\- Publish to WordPress as draft
-/publish\\_live \\- Publish immediately \\(live\\)
-/regenerate \\- Rewrite with different approach
-/reject \\- Discard article"""
-
-    return _send_message(message, parse_mode="MarkdownV2")
+    return _send_message(message, reply_markup=keyboard)
 
 
 def send_publish_confirmation(post_url, post_title):
@@ -151,7 +171,13 @@ def _escape_md(text):
     return text
 
 
-def _send_message(text, parse_mode=None):
+def send_generating_status(topic_title):
+    """Send a status message that an article is being generated."""
+    message = f"⏳ Generating article for:\n{topic_title}\n\nThis may take 30-60 seconds..."
+    return _send_message(message)
+
+
+def _send_message(text, parse_mode=None, reply_markup=None):
     """Send a message via Telegram Bot API."""
     base_url = _get_base_url()
     if not base_url:
@@ -170,6 +196,8 @@ def _send_message(text, parse_mode=None):
     }
     if parse_mode:
         payload["parse_mode"] = parse_mode
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
 
     try:
         response = requests.post(f"{base_url}/sendMessage", json=payload, timeout=15)
@@ -230,6 +258,24 @@ def get_updates(offset=None):
     except Exception as e:
         logger.error(f"Telegram getUpdates error: {e}")
         return []
+
+
+def answer_callback_query(callback_query_id, text=""):
+    """Acknowledge a callback query (inline button press)."""
+    base_url = _get_base_url()
+    if not base_url:
+        return False
+
+    payload = {"callback_query_id": callback_query_id}
+    if text:
+        payload["text"] = text
+
+    try:
+        response = requests.post(f"{base_url}/answerCallbackQuery", json=payload, timeout=10)
+        return response.json().get("ok", False)
+    except Exception as e:
+        logger.error(f"answerCallbackQuery error: {e}")
+        return False
 
 
 def test_connection():

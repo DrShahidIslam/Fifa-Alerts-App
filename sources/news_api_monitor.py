@@ -69,11 +69,47 @@ def fetch_news_headlines():
     except Exception as e:
         logger.error(f"NewsAPI top headlines error: {e}")
 
+    # ── Query 1b: Top headlines for sports category (broad coverage) ──
+    try:
+        logger.info("NewsAPI: Fetching top sports headlines")
+        sports_top = newsapi.get_top_headlines(
+            category="sports",
+            language="en",
+            page_size=20
+        )
+
+        if sports_top.get("status") == "ok":
+            for article in sports_top.get("articles", []):
+                title = article.get("title", "")
+                if not title or title == "[Removed]":
+                    continue
+
+                story = {
+                    "title": title.strip(),
+                    "summary": (article.get("description") or "").strip()[:500],
+                    "url": article.get("url", ""),
+                    "source": f"NewsAPI/{article.get('source', {}).get('name', 'Unknown')}",
+                    "source_type": "newsapi",
+                    "matched_keyword": "sports",
+                    "published_at": _parse_date(article.get("publishedAt")),
+                    "story_hash": _hash_story(title, article.get("url", "")),
+                    "image_url": article.get("urlToImage", ""),
+                }
+                stories.append(story)
+
+    except Exception as e:
+        logger.error(f"NewsAPI sports headlines error: {e}")
+
     # ── Query 2: Everything endpoint for broader coverage ───────────
     search_queries = [
         "FIFA World Cup 2026",
+        "football world cup 2026",
         "World Cup qualifier 2026",
         "World Cup 2026 tickets",
+        "football transfer",
+        "Champions League",
+        "Premier League",
+        "soccer",
     ]
 
     for query in search_queries:

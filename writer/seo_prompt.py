@@ -50,7 +50,8 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
         for key, info in INTERNAL_LINKS.items()
     ])
 
-    prompt = f"""You are an expert sports journalist and SEO writer for fifa-worldcup26.com, an unofficial FIFA World Cup 2026 guide.
+    prompt = f"""You are an expert sports journalist and master of Semantic Search, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization) for fifa-worldcup26.com.
+Your articles must be engineered to rank instantly by providing high information density, clear entity relationships, and direct answers.
 
 TASK: Write a complete, publish-ready article about the following trending topic.
 
@@ -60,33 +61,74 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 ─── SOURCE MATERIAL (use ONLY these facts, do NOT fabricate) ───
 {sources_block}
 
-─── ARTICLE REQUIREMENTS ───
+─── ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ───
 
-STRUCTURE (use this exact format):
-1. TITLE: Create an SEO-optimized title using the primary keyword. Under 60 characters. Include a hook or number if natural.
-2. META_DESCRIPTION: A compelling 150-155 character description that creates urgency. Start with an action word.
-3. SLUG: A keyword-rich URL slug (lowercase, hyphens, no stop words). Example: world-cup-2026-italy-qualifies
-4. ARTICLE BODY in HTML format:
-   - Opening paragraph (2-3 sentences, includes primary keyword naturally, hooks the reader)
-   - H2 sections (3-5 sections covering different angles of the story)
-   - Each H2 has 2-3 paragraphs of body text
-   - Include specific facts: dates, scores, player names, stadium names from the sources
-   - One H2 should tie into fan planning (tickets, travel, or viewing) — this is where affiliate/commercial value lives
-   - Closing paragraph with forward-looking statement
-5. FAQ: Write 3-4 FAQ questions and answers in this exact HTML format:
-   <div class="schema-faq">
-   <div class="faq-item">
-   <h3>Question here?</h3>
-   <p>Answer here.</p>
-   </div>
-   </div>
-6. TAGS: Suggest 5-8 WordPress tags (comma-separated)
-7. CATEGORY: Always "News"
+**1. KEYWORD DENSITY:** Ensure the primary keyword density is **strictly below 0.8%** in the paragraph text. Avoid keyword stuffing. Use synonyms and related entities instead.
+
+**2. AEO & GEO OPTIMIZATION:**
+- Use **Answer Language Processing (ALP)**: Provide direct, factual, and concise answers to the core questions implied by the topic.
+- **Entity-Focused Writing**: Explicitly mention and connect key entities (players, teams, venues, cities, dates). Use full names and titles.
+- Structure data for **Generative Search Engines**: Use clear, declarative sentences that are easy for AI models to parse and cite.
+- **EEAT**: Demonstrate expert-level insight by synthesizing source facts into a cohesive narrative with logical conclusions.
+
+**3. STYLE CONSTRAINTS:**
+- **NO EMOJIS**: Strictly prohibited in the article body and headings.
+- **NO DASHES**: Do not use dashes (—) for punctuation. Use commas, colons, or periods instead.
+- **Short Paragraphs**: 2 sentences max per <p> tag to ensure high readability scores.
+
+─── ARTICLE STRUCTURE ───
+
+1. TITLE: SEO-optimized, under 60 chars.
+2. META_DESCRIPTION: 150-155 characters. Start with an action verb.
+3. SLUG: Keyword-rich, lowercase, hyphens only.
+4. ARTICLE BODY: Magazine-quality HTML (design details below).
+5. FAQ: 3-4 schema-ready questions.
+
+─── HTML DESIGN & VISUAL HIERARCHY ───
+
+**KEY FACTS BOX** — Directly after the intro paragraph:
+<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-left: 4px solid #e94560; border-radius: 8px; padding: 24px 28px; margin: 28px 0; color: #ffffff;">
+<h3 style="margin: 0 0 16px 0; font-size: 18px; color: #e94560; text-transform: uppercase; letter-spacing: 1px;">Key Facts</h3>
+<ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+<li>[Factual insight 1]</li>
+<li>[Factual insight 2]</li>
+<li>[Factual insight 3]</li>
+</ul>
+</div>
+
+**HEADINGS** — H2 sections with red accent:
+<h2 style="font-size: 26px; font-weight: 700; color: #1a1a2e; margin: 40px 0 16px 0; padding-bottom: 10px; border-bottom: 3px solid #e94560;">Section Title</h2>
+
+**PULL QUOTES** — 1-2 quotes using source data:
+<blockquote style="border-left: 4px solid #e94560; margin: 32px 0; padding: 20px 24px; background: #f8f9fa; border-radius: 0 8px 8px 0; font-size: 19px; font-style: italic; color: #2c3e50; line-height: 1.7;">
+"Direct quote or critical statistical insight."
+</blockquote>
+
+**HIGHLIGHT BOX** — For breaking or critical info:
+<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px 24px; margin: 24px 0;">
+<strong style="color: #856404;">Important Update:</strong>
+<span style="color: #856404;"> High-value summary text.</span>
+</div>
+
+**FAQ SECTION** — Structured for Answer Engines:
+<div style="margin: 36px 0; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+<div style="border-bottom: 1px solid #e0e0e0; padding: 20px 24px;">
+<h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1a1a2e; font-weight: 600;">Question?</h3>
+<p style="margin: 0; font-size: 16px; line-height: 1.7; color: #555;">The direct, concise answer first, followed by detail.</p>
+</div>
+</div>
+
+**CLOSING CTA** — Engagement gradient box:
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 28px 32px; margin: 36px 0 20px 0; text-align: center; color: #ffffff;">
+<p style="font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #ffffff;">Explore More on World Cup 2026</p>
+<p style="font-size: 15px; margin: 0; opacity: 0.9; color: #f0f0f0;">Stay ahead with the latest news and detailed guides for the upcoming tournament.</p>
+</div>
 
 INTERNAL LINKING RULES:
-- Include 2-3 natural internal links to existing pages on our site
-- Use contextual anchor text, not "click here"
-- Available pages for linking:
+- Include 2-3 natural internal links.
+- Use anchor text from the list below.
+- Style links: <a href="URL" style="color: #e94560; text-decoration: none; font-weight: 600; border-bottom: 2px solid #e94560;">anchor text</a>
+Available pages:
 {links_suggestion}
 
 EDITORIAL GUIDELINES:
@@ -109,11 +151,11 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[Your full HTML article body here, starting with the first <p> tag]
+[Your full styled HTML article body here, starting with the first <p> tag. Include the Key Facts box, pull quotes, highlight boxes, and closing CTA as instructed above.]
 ---CONTENT_END---
 
 ---FAQ_START---
-[Your FAQ HTML here]
+[Your styled FAQ HTML here using the accordion format above]
 ---FAQ_END---
 """
 

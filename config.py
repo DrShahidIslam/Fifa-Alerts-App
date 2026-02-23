@@ -27,12 +27,44 @@ RSS_FEEDS = {
     "Reuters Soccer": "https://www.reuters.com/rssFeed/sportsNews",
 }
 
+# ── General Football Mode ────────────────────────────────────────────
+# When True, football-specific RSS feeds pass ALL stories without keyword
+# filtering (since they already only contain football content).
+GENERAL_FOOTBALL_MODE = True
+
+# RSS feeds that are football-only (all stories are relevant when general mode is on)
+FOOTBALL_ONLY_FEEDS = [
+    "ESPN FIFA", "BBC Sport Football", "FOX Sports",
+    "The Guardian Football", "Sky Sports Football",
+]
+
 # ── Keyword Watchlists ────────────────────────────────────────────────
-# Primary keywords (must match at least one to be relevant)
+# Primary keywords — FIFA World Cup 2026 and variants
 PRIMARY_KEYWORDS = [
     "world cup 2026", "fifa 2026", "fifa world cup",
     "world cup qualifier", "world cup qualification",
     "world cup 26",
+    # Football world cup variants (user-requested)
+    "football world cup 2026", "football world cup",
+    "football worldcup 2026", "football worldcup",
+    "fifa worldcup 2026", "worldcup 2026",
+    "2026 world cup", "2026 worldcup",
+    "wc 2026", "wc2026",
+]
+
+# General football keywords — catch all major football news
+GENERAL_FOOTBALL_KEYWORDS = [
+    "football", "soccer",
+    "champions league", "europa league", "conference league",
+    "premier league", "la liga", "bundesliga", "serie a", "ligue 1",
+    "nations league", "international friendly",
+    "copa america", "euro 2028", "afcon",
+    "club world cup", "super cup",
+    "transfer", "signing", "transfer window",
+    "manager sacked", "manager appointed",
+    "penalty", "red card", "hat trick", "hat-trick",
+    "injury update", "ruled out", "suspended",
+    "var", "offside", "golden boot", "ballon d'or",
 ]
 
 # Team keywords — all qualified + playoff teams
@@ -53,16 +85,21 @@ TEAM_KEYWORDS = [
     "new zealand", "jamaica", "costa rica",
     "bolivia", "suriname", "new caledonia",
     "bosnia", "northern ireland", "georgia", "iceland",
+    # Top clubs (drive major news)
+    "real madrid", "barcelona", "manchester united", "manchester city",
+    "liverpool", "chelsea", "arsenal", "bayern munich",
+    "psg", "paris saint-germain", "juventus", "inter milan",
+    "ac milan", "atletico madrid", "borussia dortmund",
 ]
 
-# Player keywords — stars fans search for
+# Player keywords — stars fans search for (no "world cup" suffix needed)
 PLAYER_KEYWORDS = [
-    "messi world cup", "ronaldo world cup", "mbappe world cup",
-    "haaland world cup", "bellingham world cup", "vinicius world cup",
-    "salah world cup", "kane world cup", "de bruyne world cup",
-    "neymar world cup", "pedri world cup", "saka world cup",
-    "pulisic world cup", "alphonso davies world cup",
-    "son heung-min world cup", "lamine yamal world cup",
+    "messi", "ronaldo", "mbappe", "haaland", "bellingham",
+    "vinicius", "salah", "kane", "de bruyne",
+    "neymar", "pedri", "saka", "pulisic", "alphonso davies",
+    "son heung-min", "lamine yamal", "erling haaland",
+    "bukayo saka", "phil foden", "bruno fernandes",
+    "victor osimhen", "florian wirtz", "jamal musiala",
 ]
 
 # Venue & logistics keywords
@@ -88,15 +125,15 @@ LOGISTICS_KEYWORDS = [
 
 # Combined master list for filtering
 ALL_KEYWORDS = (
-    PRIMARY_KEYWORDS + TEAM_KEYWORDS + PLAYER_KEYWORDS +
-    VENUE_KEYWORDS + LOGISTICS_KEYWORDS
+    PRIMARY_KEYWORDS + GENERAL_FOOTBALL_KEYWORDS + TEAM_KEYWORDS +
+    PLAYER_KEYWORDS + VENUE_KEYWORDS + LOGISTICS_KEYWORDS
 )
 
 # ── Detection Settings ────────────────────────────────────────────────
 SPIKE_THRESHOLD = 2.0           # 2x above the rolling average = spike
 ROLLING_WINDOW_HOURS = 24       # Baseline window for comparison
 SCAN_INTERVAL_MINUTES = 30      # How often the agent scans
-DEDUP_WINDOW_HOURS = 12         # Don't re-alert about the same story within 12h
+DEDUP_WINDOW_HOURS = 168        # Don't re-alert about the same story within 7 days
 
 # ── Google Trends Settings ────────────────────────────────────────────
 TRENDS_GEO = ""                 # Worldwide (empty = global)

@@ -145,4 +145,10 @@ def cleanup_old_data(conn, days=7):
     cutoff = datetime.utcnow() - timedelta(days=days)
     conn.execute("DELETE FROM keyword_mentions WHERE recorded_at < ?", (cutoff.isoformat(),))
     conn.execute("DELETE FROM trend_snapshots WHERE recorded_at < ?", (cutoff.isoformat(),))
+
+    # Also clean up seen_stories and notifications older than 14 days
+    # (2x the 7-day dedup window as safety margin)
+    old_cutoff = datetime.utcnow() - timedelta(days=14)
+    conn.execute("DELETE FROM seen_stories WHERE first_seen_at < ?", (old_cutoff.isoformat(),))
+    conn.execute("DELETE FROM notifications_sent WHERE sent_at < ?", (old_cutoff.isoformat(),))
     conn.commit()

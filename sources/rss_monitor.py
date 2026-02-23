@@ -40,9 +40,12 @@ def _hash_story(title, url):
 def fetch_rss_stories():
     """
     Fetch stories from all configured RSS feeds.
-    Returns a list of story dicts that match World Cup keywords.
+    In GENERAL_FOOTBALL_MODE, football-only feeds pass all stories.
+    Other feeds still use keyword filtering.
     """
     stories = []
+    general_mode = getattr(config, "GENERAL_FOOTBALL_MODE", False)
+    football_feeds = getattr(config, "FOOTBALL_ONLY_FEEDS", [])
 
     for feed_name, feed_url in config.RSS_FEEDS.items():
         try:
@@ -53,14 +56,22 @@ def fetch_rss_stories():
                 logger.warning(f"RSS feed error for {feed_name}: {feed.bozo_exception}")
                 continue
 
+            # In general mode, football-only feeds accept all stories
+            is_football_feed = general_mode and feed_name in football_feeds
+
             for entry in feed.entries[:30]:  # Check latest 30 entries
                 title = entry.get("title", "")
                 summary = entry.get("summary", entry.get("description", ""))
                 link = entry.get("link", "")
 
-                # Check if this story is World Cup related
-                combined_text = f"{title} {summary}"
-                is_match, matched_keyword = _matches_keywords(combined_text)
+                if is_football_feed:
+                    # Accept all stories from football-only feeds
+                    is_match = True
+                    matched_keyword = "general_football"
+                else:
+                    # Check if this story matches keywords
+                    combined_text = f"{title} {summary}"
+                    is_match, matched_keyword = _matches_keywords(combined_text)
 
                 if is_match:
                     # Parse published date
@@ -90,7 +101,7 @@ def fetch_rss_stories():
             logger.error(f"Error fetching RSS feed {feed_name}: {e}")
             continue
 
-    logger.info(f"RSS Monitor: Found {len(stories)} World Cup stories across {len(config.RSS_FEEDS)} feeds")
+    logger.info(f"RSS Monitor: Found {len(stories)} football stories across {len(config.RSS_FEEDS)} feeds")
     return stories
 
 

@@ -25,9 +25,18 @@ from sources.trends_monitor import fetch_trending_queries, get_realtime_trending
 from sources.news_api_monitor import fetch_news_headlines
 from detection.spike_detector import detect_spikes
 from notifications.telegram_bot import (
-    send_trending_alert, send_simple_message, send_status_update, test_connection
+    send_trending_alert, send_simple_message, send_status_update,
+    send_article_preview, send_publish_confirmation, send_generating_status,
+    get_updates, answer_callback_query, test_connection
 )
 from database.db import get_connection, cleanup_old_data, mark_notified, record_notification
+from writer.article_generator import generate_article
+from publisher.wordpress_client import create_post
+
+# ── Global state for command handler ──────────────────────────────────
+_latest_topics = []       # Most recent trending topics from last scan
+_pending_article = None   # Article awaiting approval
+_update_offset = None     # Telegram getUpdates offset
 
 # ── Logging Setup ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -152,7 +161,117 @@ def run_scan():
 
     conn.close()
     logger.info(f"\n📊 Scan complete: {alerts_sent} alerts sent out of {len(trending_topics)} topics")
+
+    # Store topics for command handler
+    global _latest_topics
+    _latest_topics = trending_topics
+
     return alerts_sent
+
+
+def check_and_handle_commands():
+    """
+    Poll Telegram for incoming commands/button presses and handle them.
+    Supports:
+      - write_article (inline button or /write_article text)
+      - approve / publish_live (inline button or /approve, /publish_live text)
+      - ignore (inline button)
+    """
+    global _update_offset, _latest_topics, _pending_article
+
+    updates = get_updates(offset=_update_offset)
+    if not updates:
+        return
+
+    for update in updates:
+        _update_offset = update["update_id"] + 1
+
+        # Handle inline button callback
+        callback = update.get("callback_query")
+        if callback:
+            data = callback.get("data", "")
+            callback_id = callback.get("id")
+            logger.info(f"📱 Received callback: {data}")
+
+            if data == "write_article":
+                answer_callback_query(callback_id, "✍️ Generating article...")
+                _handle_write_article()
+            elif data == "approve":
+                answer_callback_query(callback_id, "✅ Publishing as draft...")
+                _handle_approve(status="draft")
+            elif data == "publish_live":
+                answer_callback_query(callback_id, "🚀 Publishing live...")
+                _handle_approve(status="publish")
+            elif data == "reject":
+                answer_callback_query(callback_id, "🗑️ Article discarded.")
+                _pending_article = None
+                send_simple_message("🗑️ Article discarded.")
+            elif data == "ignore":
+                answer_callback_query(callback_id, "👍 Ignored.")
+            continue
+
+        # Handle text commands
+        message = update.get("message", {})
+        text = message.get("text", "").strip().lower()
+
+        if text.startswith("/write_article"):
+            _handle_write_article()
+        elif text.startswith("/approve"):
+            _handle_approve(status="draft")
+        elif text.startswith("/publish_live"):
+            _handle_approve(status="publish")
+        elif text.startswith("/reject"):
+            _pending_article = None
+            send_simple_message("🗑️ Article discarded.")
+
+
+def _handle_write_article():
+    """Generate an article from the most recent trending topic."""
+    global _pending_article, _latest_topics
+
+    if not _latest_topics:
+        send_simple_message("⚠️ No trending topics available. Wait for the next scan.")
+        return
+
+    topic = _latest_topics[0]  # Use the highest-scored topic
+    logger.info(f"📝 Generating article for: {topic['topic']}")
+
+    send_generating_status(topic["topic"])
+
+    try:
+        article = generate_article(topic)
+        if article:
+            _pending_article = article
+            send_article_preview(article)
+            logger.info(f"✅ Article preview sent: {article['title']}")
+        else:
+            send_simple_message("❌ Article generation failed. Try again later.")
+    except Exception as e:
+        logger.error(f"Article generation error: {e}")
+        send_simple_message(f"❌ Error generating article: {str(e)[:200]}")
+
+
+def _handle_approve(status="draft"):
+    """Publish the pending article to WordPress."""
+    global _pending_article
+
+    if not _pending_article:
+        send_simple_message("⚠️ No article pending approval. Generate one first with ✍️ Write Article.")
+        return
+
+    logger.info(f"📤 Publishing article: {_pending_article['title']} (status: {status})")
+
+    try:
+        result = create_post(_pending_article, status=status)
+        if result:
+            send_publish_confirmation(result["post_url"], _pending_article["title"])
+            logger.info(f"✅ Published: {result['post_url']}")
+            _pending_article = None
+        else:
+            send_simple_message("❌ WordPress publishing failed. Check your WP credentials.")
+    except Exception as e:
+        logger.error(f"WordPress publish error: {e}")
+        send_simple_message(f"❌ Publishing error: {str(e)[:200]}")
 
 
 def run_agent_loop():
@@ -184,6 +303,12 @@ def run_agent_loop():
 
             alerts = run_scan()
 
+            # Check for commands after each scan
+            try:
+                check_and_handle_commands()
+            except Exception as e:
+                logger.error(f"Command handler error: {e}")
+
             # Periodic cleanup
             if scan_count % 48 == 0:  # Every ~24 hours (at 30-min intervals)
                 logger.info("🧹 Running database cleanup...")
@@ -202,6 +327,26 @@ def run_agent_loop():
             logger.error(f"❌ Scan error: {e}", exc_info=True)
             logger.info(f"Retrying in {interval} minutes...")
             time.sleep(interval * 60)
+
+
+def run_listen_loop():
+    """
+    Listen-only mode — polls for Telegram commands without running scans.
+    Useful for handling /write_article, /approve etc. between scan cycles.
+    """
+    logger.info("👂 Listening for Telegram commands...")
+    send_simple_message("👂 Agent is listening for commands. Tap ✍️ Write Article on any alert.")
+
+    while True:
+        try:
+            check_and_handle_commands()
+            time.sleep(2)  # Poll every 2 seconds
+        except KeyboardInterrupt:
+            logger.info("\n⏹️ Listener stopped.")
+            break
+        except Exception as e:
+            logger.error(f"Listen loop error: {e}")
+            time.sleep(5)
 
 
 def test_all_connections():
@@ -295,13 +440,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FIFA World Cup 2026 News Agent")
     parser.add_argument("--once", action="store_true", help="Run a single scan and exit")
     parser.add_argument("--test", action="store_true", help="Test all API connections")
+    parser.add_argument("--listen", action="store_true", help="Listen for Telegram commands only")
     args = parser.parse_args()
 
     if args.test:
         test_all_connections()
+    elif args.listen:
+        run_listen_loop()
     elif args.once:
         logger.info("Running single scan...")
         run_scan()
+        # Also check for any pending commands
+        check_and_handle_commands()
         logger.info("Done.")
     else:
         run_agent_loop()
