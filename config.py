@@ -103,7 +103,7 @@ TRENDS_GEO = ""                 # Worldwide (empty = global)
 TRENDS_KEYWORDS_PER_BATCH = 5   # pytrends allows max 5 keywords per request
 
 # ── WordPress Settings ────────────────────────────────────────────────
-WP_DEFAULT_CATEGORY = "News"
+WP_DEFAULT_CATEGORY = "Blog"
 WP_DEFAULT_STATUS = "draft"     # 'draft', 'pending', or 'publish'
 
 # ── Article Generation Settings ────────────────────────────────────────
