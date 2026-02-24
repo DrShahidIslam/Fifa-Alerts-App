@@ -22,13 +22,23 @@ Wordfence sees the Python `requests` module and assumes it's a malicious bot. Yo
 3. Ensure the password `Simon` generated here is the exact one you pasted into `.env`. Ensure that user has Author/Editor rights.
 
 ## Step 3: Cloudflare Settings (If Applicable)
-If you are using Cloudflare, it might be issuing a "Browser Integrity Check" challenge (the 502/403 errors we saw in the logs).
+If you are using Cloudflare, it aggressively blocks automated scripts like Python `requests` with a `403 Forbidden` response. 
 
-1. Go to your **Cloudflare Dashboard**.
-2. Navigate to **Security > WAF** (Web Application Firewall) -> **Custom Rules**.
-3. Create a rule to bypass security for the REST API:
+**IMPORTANT: If you are on the Cloudflare Free Plan:**
+Custom WAF rules **cannot** bypass the "Bot Fight Mode" challenge. If Bot Fight Mode is on, your script will always be blocked, regardless of the rules you set below.
+1. Go to **Security > Bots**.
+2. Toggle **Bot Fight Mode** to **Off**.
+
+**If you are on a Paid Plan (Pro/Business):**
+You can keep Bot Fight Mode on and bypass it with a Custom Rule:
+1. Navigate to **Security > WAF** (Web Application Firewall) -> **Custom Rules**.
+2. Create a rule to bypass security for the REST API:
    - **Field:** `URI Path`
    - **Operator:** `starts with`
    - **Value:** `/wp-json/`
-   - **Choose action:** `Skip` or `Bypass` (select all security checks like Browser Integrity Check and Bot Fight Mode).
-4. Save and deploy the rule.
+   - **Choose action:** `Skip` 
+   - Check **All remaining custom rules**
+   - Check **Rate limiting rules**
+   - Check **Browser Integrity Check**
+   - Check **Bot Fight Mode** and **Super Bot Fight Mode**
+3. Save and deploy the rule.
