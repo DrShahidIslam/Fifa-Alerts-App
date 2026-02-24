@@ -162,7 +162,7 @@ WP_DEFAULT_STATUS = "draft"     # 'draft', 'pending', or 'publish'
 # ── Article Generation Settings ────────────────────────────────────────
 ARTICLE_MIN_WORDS = 800
 ARTICLE_MAX_WORDS = 1500
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ── Logging ───────────────────────────────────────────────────────────
 LOG_FILE = "agent.log"
