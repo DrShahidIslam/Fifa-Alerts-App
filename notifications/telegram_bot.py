@@ -77,7 +77,7 @@ def send_trending_alert(topic):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✍️ Write Article", "callback_data": "write_article"},
+                {"text": "✍️ Generate (Queued)", "callback_data": "write_article"},
                 {"text": "🚫 Ignore", "callback_data": "ignore"},
             ]
         ]
@@ -128,8 +128,8 @@ def send_article_preview(article_data):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✅ Approve (Draft)", "callback_data": "approve"},
-                {"text": "🚀 Publish Live", "callback_data": "publish_live"},
+                {"text": "✅ Approve Draft (Queued)", "callback_data": "approve"},
+                {"text": "🚀 Publish Live (Queued)", "callback_data": "publish_live"},
             ],
             [
                 {"text": "🔄 Regenerate", "callback_data": "write_article"},
@@ -203,8 +203,8 @@ def send_image_preview(image_path, article_title):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✅ Use Image", "callback_data": "approve_image"},
-                {"text": "🔄 Regenerate", "callback_data": "regenerate_image"},
+                {"text": "✅ Use Image (Queued)", "callback_data": "approve_image"},
+                {"text": "🔄 Regenerate Image", "callback_data": "regenerate_image"},
             ],
             [
                 {"text": "🚫 Skip Image", "callback_data": "skip_image"},

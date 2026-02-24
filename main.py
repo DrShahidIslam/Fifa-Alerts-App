@@ -14,7 +14,9 @@ import logging
 import time
 import sys
 import os
+import json
 from datetime import datetime
+
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -42,6 +44,34 @@ _pending_image_path = None  # Featured image awaiting approval
 _update_offset = None     # Telegram getUpdates offset
 _gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
 _article_attempted_this_run = False  # Limit to one article generation per --once run
+
+def save_pending_state():
+    """Save pending article and image path to disk for cross-run persistence."""
+    state = {
+        "article": _pending_article,
+        "image_path": _pending_image_path
+    }
+    try:
+        with open("pending_state.json", "w", encoding="utf-8") as f:
+            json.dump(state, f)
+    except Exception as e:
+        logger.error(f"Failed to save pending state: {e}")
+
+def load_pending_state():
+    """Load pending article and image path from disk."""
+    global _pending_article, _pending_image_path
+    if _pending_article:
+        return True
+    try:
+        if os.path.exists("pending_state.json"):
+            with open("pending_state.json", "r", encoding="utf-8") as f:
+                state = json.load(f)
+                _pending_article = state.get("article")
+                _pending_image_path = state.get("image_path")
+                return bool(_pending_article)
+    except Exception as e:
+        logger.error(f"Failed to load pending state: {e}")
+    return False
 
 # ── Logging Setup ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -211,6 +241,7 @@ def check_and_handle_commands():
                 answer_callback_query(callback_id, "🗑️ Article discarded.")
                 _pending_article = None
                 _pending_image_path = None
+                save_pending_state()
                 send_simple_message("🗑️ Article discarded.")
             elif data == "approve_image":
                 answer_callback_query(callback_id, "✅ Image approved!")
@@ -221,6 +252,7 @@ def check_and_handle_commands():
             elif data == "skip_image":
                 answer_callback_query(callback_id, "🚫 Image skipped.")
                 _pending_image_path = None
+                save_pending_state()
                 send_simple_message("🚫 Image skipped. Article will be published without a featured image.")
             elif data == "ignore":
                 answer_callback_query(callback_id, "👍 Ignored.")
@@ -238,6 +270,8 @@ def check_and_handle_commands():
             _handle_approve(status="publish")
         elif text.startswith("/reject"):
             _pending_article = None
+            _pending_image_path = None
+            save_pending_state()
             send_simple_message("🗑️ Article discarded.")
 
 
@@ -257,13 +291,37 @@ def _handle_write_article():
         send_simple_message("⏸️ Gemini API quota exhausted. Article generation paused until next cycle.")
         return
 
-    if not _latest_topics:
-        send_simple_message("⚠️ No trending topics available. Wait for the next scan.")
+    topic = None
+    if _latest_topics:
+        topic = _latest_topics[0]
+    else:
+        # Reconstruct from DB if running in isolated environment (e.g., GitHub Actions)
+        try:
+            conn = get_connection()
+            row = conn.execute("""
+                SELECT s.title, s.source, s.url, s.keywords, s.story_hash
+                FROM notifications_sent n
+                JOIN seen_stories s ON n.story_hash = s.story_hash
+                ORDER BY n.sent_at DESC LIMIT 1
+            """).fetchone()
+            conn.close()
+            
+            if row:
+                topic = {
+                    "topic": row["title"],
+                    "matched_keyword": row["keywords"],
+                    "top_url": row["url"],
+                    "stories": [{"title": row["title"], "source": row["source"], "url": row["url"], "summary": row["title"]}]
+                }
+        except Exception as e:
+            logger.error(f"Error reading last topic from DB: {e}")
+
+    if not topic:
+        send_simple_message("⚠️ No trending topics found in memory or database. Wait for the next scan.")
         return
 
     _article_attempted_this_run = True  # Mark as attempted before trying
 
-    topic = _latest_topics[0]  # Use the highest-scored topic
     logger.info(f"📝 Generating article for: {topic['topic']}")
 
     send_generating_status(topic["topic"])
@@ -274,6 +332,7 @@ def _handle_write_article():
             _pending_article = article
             send_article_preview(article)
             logger.info(f"✅ Article preview sent: {article['title']}")
+            save_pending_state()
             # Auto-generate featured image after article is ready
             _generate_and_preview_image(article.get("title", ""))
         else:
@@ -302,6 +361,7 @@ def _generate_and_preview_image(article_title):
         image_path = generate_featured_image(article_title)
         if image_path:
             _pending_image_path = image_path
+            save_pending_state()
             send_image_preview(image_path, article_title)
             logger.info(f"🖼️ Image preview sent: {image_path}")
         else:
@@ -315,7 +375,7 @@ def _handle_regenerate_image():
     """Regenerate the featured image for the pending article."""
     global _pending_image_path
 
-    if not _pending_article:
+    if not _pending_article and not load_pending_state():
         send_simple_message("⚠️ No article pending. Nothing to generate an image for.")
         return
 
@@ -327,7 +387,7 @@ def _handle_approve(status="draft"):
     """Publish the pending article to WordPress."""
     global _pending_article, _pending_image_path
 
-    if not _pending_article:
+    if not _pending_article and not load_pending_state():
         send_simple_message("⚠️ No article pending approval. Generate one first with ✍️ Write Article.")
         return
 
@@ -345,6 +405,7 @@ def _handle_approve(status="draft"):
             logger.info(f"✅ Published{img_note}: {result['post_url']}")
             _pending_article = None
             _pending_image_path = None
+            save_pending_state()
         else:
             send_simple_message("❌ WordPress publishing failed. Check your WP credentials.")
     except Exception as e:
@@ -525,10 +586,32 @@ if __name__ == "__main__":
     elif args.listen:
         run_listen_loop()
     elif args.once:
-        logger.info("Running single scan...")
+        logger.info("Running single scan and processing commands...")
 
-        # Run the scan
+        # 1. Check for pending commands from previous runs
+        try:
+            check_and_handle_commands()
+        except Exception as e:
+            logger.error(f"Command handler error before scan: {e}")
+
+        # 2. Run the scan
         alerts = run_scan()
+
+        if alerts > 0:
+            logger.info("Alerts sent. Polling for commands for 2 minutes to provide instant feedback...")
+            end_time = time.time() + 120
+            while time.time() < end_time:
+                try:
+                    check_and_handle_commands()
+                except Exception as e:
+                    logger.error(f"Command handler error after scan: {e}")
+                time.sleep(3)
+        else:
+            # Poll one last time in case of a recent click
+            try:
+                check_and_handle_commands()
+            except Exception as e:
+                logger.error(f"Command handler error after scan: {e}")
 
         logger.info("Done.")
     else:
