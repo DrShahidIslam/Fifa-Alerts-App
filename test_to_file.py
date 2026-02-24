@@ -58,9 +58,15 @@ results.append("\n[4] WordPress REST API:")
 try:
     import requests as req
     from requests.auth import HTTPBasicAuth
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
     resp = req.get(
         f"{config.WP_URL}/wp-json/wp/v2/categories",
         auth=HTTPBasicAuth(config.WP_USERNAME, config.WP_APP_PASSWORD),
+        headers=headers,
         timeout=15
     )
     if resp.status_code == 200:

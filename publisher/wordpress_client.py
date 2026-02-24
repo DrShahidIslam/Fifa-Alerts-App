@@ -16,10 +16,12 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# WordPress REST API endpoints
 API_BASE = f"{config.WP_URL}/wp-json/wp/v2"
 AUTH = HTTPBasicAuth(config.WP_USERNAME, config.WP_APP_PASSWORD)
 TIMEOUT = 30
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 
 def create_post(article, featured_image_path=None, status=None):
@@ -75,6 +77,7 @@ def create_post(article, featured_image_path=None, status=None):
             f"{API_BASE}/posts",
             json=post_data,
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -117,11 +120,11 @@ def upload_media(file_path, title=""):
     try:
         with open(file_path, "rb") as f:
             file_data = f.read()
-
-        headers = {
+        headers = HEADERS.copy()
+        headers.update({
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": mime_type,
-        }
+        })
 
         response = requests.post(
             f"{API_BASE}/media",
@@ -141,6 +144,7 @@ def upload_media(file_path, title=""):
                     f"{API_BASE}/media/{media_id}",
                     json={"alt_text": title[:125]},
                     auth=AUTH,
+                    headers=HEADERS,
                     timeout=15
                 )
 
@@ -158,11 +162,11 @@ def upload_media(file_path, title=""):
 def get_or_create_category(name):
     """Get category ID by name, creating it if it doesn't exist."""
     try:
-        # Search for existing category
         response = requests.get(
             f"{API_BASE}/categories",
             params={"search": name, "per_page": 5},
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -172,11 +176,11 @@ def get_or_create_category(name):
                 if cat["name"].lower() == name.lower():
                     return cat["id"]
 
-        # Create new category
         response = requests.post(
             f"{API_BASE}/categories",
             json={"name": name},
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -194,11 +198,11 @@ def get_or_create_category(name):
 def get_or_create_tag(name):
     """Get tag ID by name, creating it if it doesn't exist."""
     try:
-        # Search for existing tag
         response = requests.get(
             f"{API_BASE}/tags",
             params={"search": name, "per_page": 5},
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -208,11 +212,11 @@ def get_or_create_tag(name):
                 if tag["name"].lower() == name.lower():
                     return tag["id"]
 
-        # Create new tag
         response = requests.post(
             f"{API_BASE}/tags",
             json={"name": name},
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -249,6 +253,7 @@ def _set_rankmath_meta(post_id, article):
             f"{API_BASE}/posts/{post_id}",
             json=rankmath_meta,
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
@@ -282,6 +287,7 @@ def test_wordpress_connection():
             f"{API_BASE}/posts",
             params={"per_page": 1},
             auth=AUTH,
+            headers=HEADERS,
             timeout=TIMEOUT
         )
 
