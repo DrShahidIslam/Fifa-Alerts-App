@@ -33,6 +33,7 @@ from database.db import get_connection, cleanup_old_data, mark_notified, record_
 from writer.article_generator import generate_article
 from publisher.wordpress_client import create_post
 from publisher.image_handler import generate_featured_image
+from gemini_client import generate_content_with_fallback
 
 # ── Global state for command handler ──────────────────────────────────
 _latest_topics = []       # Most recent trending topics from last scan
@@ -499,11 +500,10 @@ def test_all_connections():
     # Gemini API
     print("\n6️⃣  Google Gemini API:")
     try:
-        from google import genai
-        client = genai.Client(api_key=config.GEMINI_API_KEY)
-        response = client.models.generate_content(
+        response = generate_content_with_fallback(
             model=config.GEMINI_MODEL,
-            contents="Say 'API connected' in exactly two words."
+            contents="Say 'API connected' in exactly two words.",
+            max_retries_per_key=1
         )
         print(f"   ✅ Connected — Response: {response.text.strip()}")
     except Exception as e:

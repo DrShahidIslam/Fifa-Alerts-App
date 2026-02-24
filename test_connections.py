@@ -83,11 +83,11 @@ except Exception as e:
 # 5. Gemini API
 print("\n[5] Google Gemini API:")
 try:
-    from google import genai
-    client = genai.Client(api_key=config.GEMINI_API_KEY)
-    response = client.models.generate_content(
+    from gemini_client import generate_content_with_fallback
+    response = generate_content_with_fallback(
         model=config.GEMINI_MODEL,
-        contents="Respond with exactly: CONNECTED"
+        contents="Respond with exactly: CONNECTED",
+        max_retries_per_key=1
     )
     text = response.text.strip()
     print(f"    OK - Response: {text}")
