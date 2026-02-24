@@ -101,8 +101,22 @@ def fetch_rss_stories():
             logger.error(f"Error fetching RSS feed {feed_name}: {e}")
             continue
 
-    logger.info(f"RSS Monitor: Found {len(stories)} football stories across {len(config.RSS_FEEDS)} feeds")
-    return stories
+    # Exclusion filter — remove cricket, rugby, etc. at source level
+    exclude_kws = getattr(config, "EXCLUDE_KEYWORDS", [])
+    filtered = []
+    excluded_count = 0
+    for story in stories:
+        text = f"{story.get('title', '')} {story.get('summary', '')}".lower()
+        if any(kw.lower() in text for kw in exclude_kws):
+            excluded_count += 1
+            continue
+        filtered.append(story)
+
+    if excluded_count > 0:
+        logger.info(f"RSS Monitor: Excluded {excluded_count} irrelevant stories (cricket/rugby/etc.)")
+
+    logger.info(f"RSS Monitor: Found {len(filtered)} football stories across {len(config.RSS_FEEDS)} feeds")
+    return filtered
 
 
 if __name__ == "__main__":

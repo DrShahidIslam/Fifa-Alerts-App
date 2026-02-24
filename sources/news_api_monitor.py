@@ -154,8 +154,22 @@ def fetch_news_headlines():
             seen_hashes.add(story["story_hash"])
             unique_stories.append(story)
 
-    logger.info(f"NewsAPI Monitor: Found {len(unique_stories)} unique stories (from {len(stories)} total)")
-    return unique_stories
+    # Exclusion filter — remove cricket, rugby, etc.
+    exclude_kws = getattr(config, "EXCLUDE_KEYWORDS", [])
+    filtered = []
+    excluded = 0
+    for story in unique_stories:
+        text = f"{story.get('title', '')} {story.get('summary', '')}".lower()
+        if any(kw.lower() in text for kw in exclude_kws):
+            excluded += 1
+            continue
+        filtered.append(story)
+
+    if excluded > 0:
+        logger.info(f"NewsAPI Monitor: Excluded {excluded} irrelevant stories (cricket/rugby/etc.)")
+
+    logger.info(f"NewsAPI Monitor: Found {len(filtered)} relevant stories (from {len(stories)} total)")
+    return filtered
 
 
 def _parse_date(date_str):

@@ -26,6 +26,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore agent database
+        uses: actions/cache@v4
+        with:
+          path: agent.db
+          key: agent-db-${{ hashFiles('config.py') }}-week-${{ github.run_number }}
+          restore-keys: |
+            agent-db-${{ hashFiles('config.py') }}-week-
+            agent-db-
+
       - name: Run news scan and handle commands
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

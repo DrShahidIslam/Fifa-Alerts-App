@@ -70,10 +70,17 @@ GENERAL_FOOTBALL_KEYWORDS = [
 
 # Exclusion keywords — stories/trends containing these are discarded
 EXCLUDE_KEYWORDS = [
+    # Cricket
     "t20", "cricket", "ipl", "odi", "test match",
+    "icc", "cwc", "psl", "bbl", "big bash", "ashes",
+    "bcci", "ecb cricket", "wpl", "hundred cricket",
+    "wicket", "bowled", "lbw", "batting average", "run rate",
+    "over rate", "innings", "stumps", "maiden over",
+    # Other sports
     "rugby", "nfl", "nba", "baseball", "mlb",
     "tennis", "f1", "formula 1", "golf", "boxing", "ufc", "mma",
-    "hockey", "nhl", "kabaddi",
+    "hockey", "nhl", "kabaddi", "badminton", "swimming",
+    "cycling", "wrestling", "snooker",
 ]
 
 # Team keywords — national teams only (no clubs to avoid league noise)
