@@ -148,7 +148,7 @@ ALL_KEYWORDS = (
 SPIKE_THRESHOLD = 2.0           # 2x above the rolling average = spike
 SPIKE_MIN_SCORE = 40            # Minimum spike score to trigger alert (was 15)
 ROLLING_WINDOW_HOURS = 24       # Baseline window for comparison
-SCAN_INTERVAL_MINUTES = 30      # How often the agent scans
+SCAN_INTERVAL_MINUTES = 60      # How often the agent scans (60m = 24 req/day, well within NewsAPI 100 limit)
 DEDUP_WINDOW_HOURS = 168        # Don't re-alert about the same story within 7 days
 
 # ── Google Trends Settings ────────────────────────────────────────────
