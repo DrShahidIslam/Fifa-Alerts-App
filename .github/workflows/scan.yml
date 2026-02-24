@@ -32,6 +32,7 @@ jobs:
           path: |
             agent.db
             pending_state.json
+            latest_topics.json
           key: agent-db-${{ hashFiles('config.py') }}-week-${{ github.run_number }}
           restore-keys: |
             agent-db-${{ hashFiles('config.py') }}-week-

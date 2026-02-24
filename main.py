@@ -200,6 +200,13 @@ def run_scan():
     # Store topics for command handler
     global _latest_topics
     _latest_topics = trending_topics
+    
+    # Save topics to disk for robustness across runs (especially if Telegram times out)
+    try:
+        with open("latest_topics.json", "w", encoding="utf-8") as f:
+            json.dump(_latest_topics, f, default=str)
+    except Exception as e:
+        logger.error(f"Failed to save latest topics to disk: {e}")
 
     return alerts_sent
 
@@ -295,26 +302,39 @@ def _handle_write_article():
     if _latest_topics:
         topic = _latest_topics[0]
     else:
-        # Reconstruct from DB if running in isolated environment (e.g., GitHub Actions)
+        # Reconstruct from disk if running in isolated environment (e.g., GitHub Actions)
+        # We use a local JSON file now because DB 'notifications_sent' might be empty if Telegram timed out.
         try:
-            conn = get_connection()
-            row = conn.execute("""
-                SELECT s.title, s.source, s.url, s.keywords, s.story_hash
-                FROM notifications_sent n
-                JOIN seen_stories s ON n.story_hash = s.story_hash
-                ORDER BY n.sent_at DESC LIMIT 1
-            """).fetchone()
-            conn.close()
-            
-            if row:
-                topic = {
-                    "topic": row["title"],
-                    "matched_keyword": row["keywords"],
-                    "top_url": row["url"],
-                    "stories": [{"title": row["title"], "source": row["source"], "url": row["url"], "summary": row["title"]}]
-                }
+            if os.path.exists("latest_topics.json"):
+                with open("latest_topics.json", "r", encoding="utf-8") as f:
+                    saved_topics = json.load(f)
+                    if saved_topics and len(saved_topics) > 0:
+                        topic = saved_topics[0]
+                        _latest_topics = saved_topics  # Restore to memory
         except Exception as e:
-            logger.error(f"Error reading last topic from DB: {e}")
+            logger.error(f"Error reading last topics from disk: {e}")
+            
+        # Fallback to DB (legacy approach) if JSON is missing
+        if not topic:
+            try:
+                conn = get_connection()
+                row = conn.execute("""
+                    SELECT s.title, s.source, s.url, s.keywords, s.story_hash
+                    FROM notifications_sent n
+                    JOIN seen_stories s ON n.story_hash = s.story_hash
+                    ORDER BY n.sent_at DESC LIMIT 1
+                """).fetchone()
+                conn.close()
+                
+                if row:
+                    topic = {
+                        "topic": row["title"],
+                        "matched_keyword": row["keywords"],
+                        "top_url": row["url"],
+                        "stories": [{"title": row["title"], "source": row["source"], "url": row["url"], "summary": row["title"]}]
+                    }
+            except Exception as e:
+                logger.error(f"Error reading last topic from DB: {e}")
 
     if not topic:
         send_simple_message("⚠️ No trending topics found in memory or database. Wait for the next scan.")
