@@ -527,20 +527,8 @@ if __name__ == "__main__":
     elif args.once:
         logger.info("Running single scan...")
 
-        # First, handle any pending commands from PREVIOUS runs
-        # (e.g., user tapped Approve/Reject after last --once exited)
-        try:
-            check_and_handle_commands()
-        except Exception as e:
-            logger.error(f"Command handler error: {e}")
-
         # Run the scan
         alerts = run_scan()
-
-        # Auto-generate article for top trending topic (if any found)
-        if _latest_topics and not _gemini_quota_exhausted:
-            logger.info("📝 Auto-generating article for top trending topic...")
-            _handle_write_article()
 
         logger.info("Done.")
     else:
