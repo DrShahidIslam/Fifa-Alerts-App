@@ -80,11 +80,13 @@ EXCLUDE_KEYWORDS = [
     "bcci", "ecb cricket", "wpl", "hundred cricket",
     "wicket", "bowled", "lbw", "batting average", "run rate",
     "over rate", "innings", "stumps", "maiden over",
+    "ind vs", "pak vs", "india vs", "pakistan vs",
+    "aus vs", "eng vs", "super 8", "super 12",
     # Other sports
     "rugby", "nfl", "nba", "baseball", "mlb",
     "tennis", "f1", "formula 1", "golf", "boxing", "ufc", "mma",
     "hockey", "nhl", "kabaddi", "badminton", "swimming",
-    "cycling", "wrestling", "snooker",
+    "cycling", "wrestling", "snooker", "winter olympics", "skiing",
 ]
 
 # Team keywords — national teams only (no clubs to avoid league noise)
