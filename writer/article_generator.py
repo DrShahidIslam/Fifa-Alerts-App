@@ -21,6 +21,47 @@ logger = logging.getLogger(__name__)
 # Gemini retry handled by gemini_client
 
 
+def _search_news_for_trend(keyword):
+    """Search Google News RSS and NewsAPI to find background context for a trending keyword."""
+    urls = []
+    
+    # 1. Google News RSS
+    try:
+        import feedparser
+        import urllib.parse
+        encoded_kw = urllib.parse.quote(keyword)
+        rss_url = f"https://news.google.com/rss/search?q={encoded_kw}&hl=en-US&gl=US&ceid=US:en"
+        feed = feedparser.parse(rss_url)
+        for entry in feed.entries[:3]:
+            if entry.link and entry.link not in urls:
+                urls.append(entry.link)
+    except Exception as e:
+        logger.warning(f"Failed to fetch Google News RSS for trend: {e}")
+
+    # 2. NewsAPI
+    try:
+        from newsapi import NewsApiClient
+        from datetime import datetime, timedelta
+        newsapi = NewsApiClient(api_key=config.NEWS_API_KEY)
+        from_date = (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%d")
+        results = newsapi.get_everything(
+            q=keyword,
+            language="en",
+            sort_by="relevancy",
+            from_param=from_date,
+            page_size=5
+        )
+        if results.get("status") == "ok":
+            for article in results.get("articles", [])[:3]:
+                url = article.get("url")
+                if url and url not in urls:
+                    urls.append(url)
+    except Exception as e:
+        logger.warning(f"Failed to fetch NewsAPI for trend: {e}")
+        
+    return urls
+
+
 def generate_article(topic, source_urls=None):
     """
     Generate a complete SEO-optimized article for a trending topic.
@@ -50,8 +91,26 @@ def generate_article(topic, source_urls=None):
     if top_url and top_url not in source_urls:
         source_urls.insert(0, top_url)
 
+    # Check if this is a pure trend alert (only trends.google.com URLs)
+    is_pure_trend = True
+    if not source_urls:
+        is_pure_trend = True
+    else:
+        for url in source_urls:
+            if "trends.google.com" not in url:
+                is_pure_trend = False
+                break
+                
+    if is_pure_trend:
+        keyword = topic.get("matched_keyword") or topic.get("topic", "").replace("Rising search:", "").strip()
+        logger.info(f"  🔍 Pure trend detected. Searching active news for: '{keyword}'")
+        found_urls = _search_news_for_trend(keyword)
+        if found_urls:
+            source_urls.extend(found_urls)
+            logger.info(f"  ✅ Found {len(found_urls)} background articles for context.")
+
     logger.info(f"  Fetching {len(source_urls)} source URLs...")
-    source_texts = fetch_multiple_sources(source_urls, max_sources=5)
+    source_texts = fetch_multiple_sources(source_urls, max_sources=8)
 
     if not source_texts:
         logger.warning("  ⚠️ No source material could be extracted. Using topic summary only.")

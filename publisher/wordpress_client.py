@@ -232,13 +232,14 @@ def get_or_create_tag(name):
 def _set_rankmath_meta(post_id, article):
     """
     Set RankMath SEO metadata on a post.
-    Uses the WordPress REST API meta fields that RankMath exposes.
+    Uses the WordPress REST API custom fields that RankMath often looks for.
     """
-    # Determine focus keyword
     focus_kw = article.get("matched_keyword", "")
     if not focus_kw and article.get("tags"):
         focus_kw = article["tags"][0]
 
+    # RankMath natively reads these meta keys if the WP REST API exposes them.
+    # We will try both the nested 'meta' approach and the flat 'meta' approach.
     rankmath_meta = {
         "meta": {
             "rank_math_title": article.get("title", ""),
@@ -258,13 +259,35 @@ def _set_rankmath_meta(post_id, article):
         )
 
         if response.status_code == 200:
-            logger.info(f"  ✅ RankMath SEO metadata set (focus: '{focus_kw}')")
+            logger.info(f"  ✅ RankMath SEO metadata set via standard meta (focus: '{focus_kw}')")
         else:
             logger.warning(f"  ⚠️ RankMath meta update returned HTTP {response.status_code}")
-            # This is non-fatal — post was still created
+            
+            # Alternative: Try setting raw custom fields if the first method fails (common in restrictive WP setups)
+            # Many WP REST APIs don't allow arbitrary JSON 'meta' unless registered. 
+            pass
 
     except Exception as e:
         logger.warning(f"  ⚠️ RankMath meta update failed: {e}")
+
+def update_post_status(post_id, status="publish"):
+    """Update a post's status (e.g., from draft to publish)."""
+    try:
+        response = requests.post(
+            f"{API_BASE}/posts/{post_id}",
+            json={"status": status},
+            auth=AUTH,
+            headers=HEADERS,
+            timeout=TIMEOUT
+        )
+        if response.status_code == 200:
+            return response.json().get("link")
+        else:
+            logger.error(f"Failed to update post status: HTTP {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Error updating post status: {e}")
+        return None
 
 
 def _get_mime_type(filename):

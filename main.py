@@ -261,6 +261,10 @@ def check_and_handle_commands():
                 _pending_image_path = None
                 save_pending_state()
                 send_simple_message("🚫 Image skipped. Article will be published without a featured image.")
+            elif data.startswith("publish_draft_"):
+                post_id = data.split("_")[-1]
+                answer_callback_query(callback_id, "🚀 Making post live...")
+                _handle_publish_draft(post_id)
             elif data == "ignore":
                 answer_callback_query(callback_id, "👍 Ignored.")
             continue
@@ -421,7 +425,7 @@ def _handle_approve(status="draft"):
         )
         if result:
             img_note = " (with featured image)" if _pending_image_path else ""
-            send_publish_confirmation(result["post_url"], _pending_article["title"])
+            send_publish_confirmation(result["post_url"], _pending_article["title"], post_id=result["post_id"], status=status)
             logger.info(f"✅ Published{img_note}: {result['post_url']}")
             _pending_article = None
             _pending_image_path = None
@@ -431,6 +435,22 @@ def _handle_approve(status="draft"):
     except Exception as e:
         logger.error(f"WordPress publish error: {e}")
         send_simple_message(f"❌ Publishing error: {str(e)[:200]}")
+
+def _handle_publish_draft(post_id):
+    """Publish an existing draft on WordPress."""
+    from publisher.wordpress_client import update_post_status
+    
+    logger.info(f"🚀 Publishing draft (ID: {post_id})")
+    try:
+        url = update_post_status(post_id, "publish")
+        if url:
+            send_simple_message(f"🚀 Draft published successfully!\n🔗 {url}")
+            logger.info(f"✅ Draft {post_id} published: {url}")
+        else:
+            send_simple_message("❌ Failed to publish draft. Check logs.")
+    except Exception as e:
+        logger.error(f"Draft publish error: {e}")
+        send_simple_message(f"❌ Error publishing draft: {str(e)[:200]}")
 
 
 def run_agent_loop():

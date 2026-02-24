@@ -141,17 +141,35 @@ def send_article_preview(article_data):
     return _send_message(message, reply_markup=keyboard)
 
 
-def send_publish_confirmation(post_url, post_title):
-    """Send confirmation that an article was published."""
-    message = f"""✅ *PUBLISHED TO WORDPRESS*
+def send_publish_confirmation(post_url, post_title, post_id=None, status="publish"):
+    """Send confirmation that an article was published or saved as draft."""
+    if status.lower() == "draft":
+        status_text = "✅ SAVED AS DRAFT"
+        bottom_text = "The post is saved as a draft on your site\\."
+    else:
+        status_text = "🚀 PUBLISHED LIVE"
+        bottom_text = "The post is now live on your site\\."
+
+    message = f"""{status_text}
 {'━' * 30}
 
 📄 *Title:* {_escape_md(post_title)}
 🔗 [View Post]({post_url})
 
-The post is now live on your site\\."""
+{bottom_text}"""
 
-    return _send_message(message, parse_mode="MarkdownV2")
+    # Add inline button to publish the draft directly from Telegram
+    keyboard = None
+    if status.lower() == "draft" and post_id:
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚀 Publish Live Now", "callback_data": f"publish_draft_{post_id}"}
+                ]
+            ]
+        }
+
+    return _send_message(message, parse_mode="MarkdownV2", reply_markup=keyboard)
 
 
 def _format_factors(factors):

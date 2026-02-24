@@ -41,7 +41,9 @@ def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
     """
     try:
         # Open the image
-        if isinstance(image_path_or_bytes, bytes):
+        if isinstance(image_path_or_bytes, Image.Image):
+            img = image_path_or_bytes
+        elif isinstance(image_path_or_bytes, bytes):
             img = Image.open(io.BytesIO(image_path_or_bytes))
         else:
             img = Image.open(image_path_or_bytes)
