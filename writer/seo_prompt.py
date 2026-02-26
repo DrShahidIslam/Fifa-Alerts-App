@@ -191,21 +191,25 @@ def build_image_prompt(topic_title, article_content_snippet=""):
     Returns:
         str: Image generation prompt
     """
-    prompt = f"""Create a photorealistic editorial sports photograph for a World Cup 2026 article.
+    prompt = f"""Generate a premium, photorealistic editorial sports photograph suitable for a major sports news website like Getty Images or AFP.
 
-Topic: {topic_title}
+Context: This image is for a World Cup 2026 article about: {topic_title}
 
-Style guidelines:
-- Photorealistic sports editorial photography
-- Dynamic and energetic composition
-- World Cup / international football atmosphere
-- Stadium or football field setting where appropriate
-- Vibrant and high-contrast colors
-- No text overlays, watermarks, or logos
-- Professional sports photography look (as if from Getty Images or AFP)
+CRITICAL INSTRUCTIONS:
+- ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO NUMBERS, AND NO WATERMARKS anywhere in the image.
+- DO NOT attempt to write the topic title or any keywords on the image.
+- DO NOT include graphic design overlays, borders, or lower-thirds.
+
+Style & Composition Guidelines:
+- Photorealistic, high-end DSLR sports editorial photography
+- Dynamic, energetic, and capturing the emotional intensity of international football
+- Settings: either intense on-pitch action, passionate fans in the stadium, or dramatic stadium architecture
+- Lighting: Natural stadium lighting, high-contrast, dramatic shadows, vibrant colors
 - 16:9 aspect ratio, landscape orientation
 - The image should evoke excitement and anticipation for the World Cup
 
-Do NOT include: real faces of actual players, FIFA logos, real team crests, or trademarked designs."""
+Exclusions:
+- Do NOT include recognizable real faces of actual specific players to avoid likeness issues
+- Do NOT include official trademarked FIFA logos or specific team crests (use generic national colors/flags instead)"""
 
     return prompt

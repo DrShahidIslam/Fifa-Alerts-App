@@ -62,6 +62,7 @@ def create_post(article, featured_image_path=None, status=None):
     post_data = {
         "title": article.get("title", "Untitled"),
         "content": article.get("full_content", article.get("content", "")),
+        "excerpt": article.get("meta_description", ""),
         "slug": article.get("slug", ""),
         "status": status,
         "categories": [category_id] if category_id else [],

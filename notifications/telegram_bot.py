@@ -73,11 +73,18 @@ def send_trending_alert(topic):
 
     message = "\n".join(lines)
 
+    # Try to grab the hash from the topic, or fallback to generic
+    story_hash = topic.get("story_hash")
+    if not story_hash and topic.get("stories"):
+        story_hash = topic.get("stories")[0].get("story_hash")
+    
+    cb_data = f"write_{story_hash[:40]}" if story_hash else "write_article"
+
     # Use inline keyboard buttons for actions
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✍️ Generate (Queued)", "callback_data": "write_article"},
+                {"text": "✍️ Generate (Queued)", "callback_data": cb_data},
                 {"text": "🚫 Ignore", "callback_data": "ignore"},
             ]
         ]

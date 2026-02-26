@@ -31,7 +31,7 @@ from notifications.telegram_bot import (
     send_article_preview, send_publish_confirmation, send_generating_status,
     send_image_preview, get_updates, answer_callback_query, test_connection
 )
-from database.db import get_connection, cleanup_old_data, mark_notified, record_notification
+from database.db import get_connection, cleanup_old_data, mark_notified, record_notification, save_topic_to_cache, get_topic_from_cache
 from writer.article_generator import generate_article
 from publisher.wordpress_client import create_post
 from publisher.image_handler import generate_featured_image
@@ -181,9 +181,21 @@ def run_scan():
             if message_id:
                 alerts_sent += 1
                 # Record in database
+                topic_hash = ""
                 for story in topic.get("stories", []):
-                    mark_notified(conn, story.get("story_hash", ""))
-                record_notification(conn, topic.get("stories", [{}])[0].get("story_hash", ""), message_id)
+                    shash = story.get("story_hash", "")
+                    if shash:
+                        topic_hash = shash
+                        mark_notified(conn, shash)
+                
+                # Use the first story's hash, or a fallback, to cache the entire topic
+                if not topic_hash:
+                    import hashlib
+                    topic_hash = hashlib.md5(topic["topic"].encode()).hexdigest()
+                
+                topic["story_hash"] = topic_hash
+                save_topic_to_cache(conn, topic_hash, topic)
+                record_notification(conn, topic_hash, message_id)
                 logger.info(f"   ✅ Alert sent (Telegram ID: {message_id})")
             else:
                 logger.warning(f"   ⚠️ Failed to send alert")
@@ -235,9 +247,10 @@ def check_and_handle_commands():
             callback_id = callback.get("id")
             logger.info(f"📱 Received callback: {data}")
 
-            if data == "write_article":
+            if data.startswith("write_"):
                 answer_callback_query(callback_id, "✍️ Generating article...")
-                _handle_write_article()
+                topic_hash = data.split("_", 1)[1] if "_" in data else None
+                _handle_write_article(topic_hash)
             elif data == "approve":
                 answer_callback_query(callback_id, "✅ Publishing as draft...")
                 _handle_approve(status="draft")
@@ -286,8 +299,8 @@ def check_and_handle_commands():
             send_simple_message("🗑️ Article discarded.")
 
 
-def _handle_write_article():
-    """Generate an article from the most recent trending topic."""
+def _handle_write_article(topic_hash=None):
+    """Generate an article for a specific topic, or the most recent one if no hash provided."""
     global _pending_article, _latest_topics, _gemini_quota_exhausted, _article_attempted_this_run
 
     # Only allow one article generation attempt per --once run
@@ -303,42 +316,56 @@ def _handle_write_article():
         return
 
     topic = None
-    if _latest_topics:
-        topic = _latest_topics[0]
-    else:
-        # Reconstruct from disk if running in isolated environment (e.g., GitHub Actions)
-        # We use a local JSON file now because DB 'notifications_sent' might be empty if Telegram timed out.
+    
+    # Prioritize loading the specific topic requested via Telegram callback
+    if topic_hash:
         try:
-            if os.path.exists("latest_topics.json"):
-                with open("latest_topics.json", "r", encoding="utf-8") as f:
-                    saved_topics = json.load(f)
-                    if saved_topics and len(saved_topics) > 0:
-                        topic = saved_topics[0]
-                        _latest_topics = saved_topics  # Restore to memory
+            conn = get_connection()
+            topic = get_topic_from_cache(conn, topic_hash)
+            conn.close()
+            if topic:
+                logger.info(f"Loaded specific topic {topic_hash} from cache.")
         except Exception as e:
-            logger.error(f"Error reading last topics from disk: {e}")
-            
-        # Fallback to DB (legacy approach) if JSON is missing
-        if not topic:
+            logger.error(f"Error loading topic {topic_hash} from cache: {e}")
+
+    # Fallbacks if it wasn't a callback or the cache was cleared
+    if not topic:
+        if _latest_topics:
+            topic = _latest_topics[0]
+        else:
+            # Reconstruct from disk if running in isolated environment (e.g., GitHub Actions)
+            # We use a local JSON file now because DB 'notifications_sent' might be empty if Telegram timed out.
             try:
-                conn = get_connection()
-                row = conn.execute("""
-                    SELECT s.title, s.source, s.url, s.keywords, s.story_hash
-                    FROM notifications_sent n
-                    JOIN seen_stories s ON n.story_hash = s.story_hash
-                    ORDER BY n.sent_at DESC LIMIT 1
-                """).fetchone()
-                conn.close()
-                
-                if row:
-                    topic = {
-                        "topic": row["title"],
-                        "matched_keyword": row["keywords"],
-                        "top_url": row["url"],
-                        "stories": [{"title": row["title"], "source": row["source"], "url": row["url"], "summary": row["title"]}]
-                    }
+                if os.path.exists("latest_topics.json"):
+                    with open("latest_topics.json", "r", encoding="utf-8") as f:
+                        saved_topics = json.load(f)
+                        if saved_topics and len(saved_topics) > 0:
+                            topic = saved_topics[0]
+                            _latest_topics = saved_topics  # Restore to memory
             except Exception as e:
-                logger.error(f"Error reading last topic from DB: {e}")
+                logger.error(f"Error reading last topics from disk: {e}")
+                
+            # Fallback to DB (legacy approach) if JSON is missing
+            if not topic:
+                try:
+                    conn = get_connection()
+                    row = conn.execute("""
+                        SELECT s.title, s.source, s.url, s.keywords, s.story_hash
+                        FROM notifications_sent n
+                        JOIN seen_stories s ON n.story_hash = s.story_hash
+                        ORDER BY n.sent_at DESC LIMIT 1
+                    """).fetchone()
+                    conn.close()
+                    
+                    if row:
+                        topic = {
+                            "topic": row["title"],
+                            "matched_keyword": row["keywords"],
+                            "top_url": row["url"],
+                            "stories": [{"title": row["title"], "source": row["source"], "url": row["url"], "summary": row["title"]}]
+                        }
+                except Exception as e:
+                    logger.error(f"Error reading last topic from DB: {e}")
 
     if not topic:
         send_simple_message("⚠️ No trending topics found in memory or database. Wait for the next scan.")
@@ -652,6 +679,14 @@ if __name__ == "__main__":
                 check_and_handle_commands()
             except Exception as e:
                 logger.error(f"Command handler error after scan: {e}")
+                
+        # Final cleanup pass to acknowledge the last processed update
+        if _update_offset:
+            try:
+                get_updates(offset=_update_offset)
+                logger.info(f"Acknowledged Telegram updates up to offset {_update_offset}")
+            except Exception as e:
+                logger.error(f"Failed to clear final updates: {e}")
 
         logger.info("Done.")
     else:

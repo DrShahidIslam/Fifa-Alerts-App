@@ -57,6 +57,12 @@ def _create_tables(conn):
             recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS topic_cache (
+            story_hash TEXT PRIMARY KEY,
+            topic_json TEXT NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE INDEX IF NOT EXISTS idx_seen_stories_hash ON seen_stories(story_hash);
         CREATE INDEX IF NOT EXISTS idx_keyword_mentions_keyword ON keyword_mentions(keyword);
         CREATE INDEX IF NOT EXISTS idx_notifications_hash ON notifications_sent(story_hash);
@@ -138,6 +144,39 @@ def record_trend_snapshot(conn, keyword, interest_value, is_rising=False):
         (keyword, interest_value, 1 if is_rising else 0)
     )
     conn.commit()
+
+
+def save_topic_to_cache(conn, story_hash, topic_dict):
+    """Save a trending topic as JSON in the database for later generation."""
+    import json
+    try:
+        topic_json = json.dumps(topic_dict, default=str)
+        conn.execute(
+            """INSERT OR REPLACE INTO topic_cache (story_hash, topic_json)
+               VALUES (?, ?)""",
+            (story_hash, topic_json)
+        )
+        conn.commit()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to cache topic {story_hash}: {e}")
+
+
+def get_topic_from_cache(conn, story_hash):
+    """Retrieve a trending topic from JSON cache."""
+    import json
+    row = conn.execute(
+        "SELECT topic_json FROM topic_cache WHERE story_hash = ?",
+        (story_hash,)
+    ).fetchone()
+    
+    if row and row["topic_json"]:
+        try:
+            return json.loads(row["topic_json"])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to parse cached topic {story_hash}: {e}")
+    return None
 
 
 def cleanup_old_data(conn, days=7):
