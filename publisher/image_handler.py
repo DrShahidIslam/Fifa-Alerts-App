@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import config
 from writer.seo_prompt import build_image_prompt
-from gemini_client import generate_content_with_fallback
+from gemini_client import generate_content_with_fallback, generate_image_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -139,30 +139,28 @@ def generate_featured_image(article_title, save_dir=None):
     try:
         logger.info(f"  Generating featured image for: {article_title[:60]}")
 
-        # Use Gemini with image generation capability
-        generation_config = genai.types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-            image_config=genai.types.ImageConfig(
-                aspect_ratio="16:9",
-            ),
+        # Use Imagen 3 for image generation
+        generation_config = genai.types.GenerateImagesConfig(
+            number_of_images=1,
+            output_mime_type="image/jpeg",
+            aspect_ratio="16:9",
         )
 
-        response = generate_content_with_fallback(
-            model="gemini-2.5-flash-image",
-            contents=prompt,
+        response = generate_image_with_fallback(
+            model="imagen-3.0-generate-001",
+            prompt=prompt,
             generation_config=generation_config
         )
 
         # Extract image from response
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                    # Compress to WebP under 100KB
-                    result = _compress_to_webp(part.inline_data.data, output_path)
-                    if result:
-                        final_size = os.path.getsize(result) / 1024
-                        logger.info(f"    Image ready: {result} ({final_size:.1f}KB)")
-                        return result
+        if response.generated_images:
+            for generated_image in response.generated_images:
+                # Compress to WebP under 100KB
+                result = _compress_to_webp(generated_image.image.image_bytes, output_path)
+                if result:
+                    final_size = os.path.getsize(result) / 1024
+                    logger.info(f"    Image ready: {result} ({final_size:.1f}KB)")
+                    return result
 
         logger.warning("    No image in Gemini response, using fallback")
         return _generate_fallback_image(article_title, output_path)

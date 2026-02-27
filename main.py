@@ -53,7 +53,7 @@ def save_pending_state():
     }
     try:
         with open("pending_state.json", "w", encoding="utf-8") as f:
-            json.dump(state, f)
+            json.dump(state, f, default=str)
     except Exception as e:
         logger.error(f"Failed to save pending state: {e}")
 

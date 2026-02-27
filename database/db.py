@@ -166,8 +166,8 @@ def get_topic_from_cache(conn, story_hash):
     """Retrieve a trending topic from JSON cache."""
     import json
     row = conn.execute(
-        "SELECT topic_json FROM topic_cache WHERE story_hash = ?",
-        (story_hash,)
+        "SELECT topic_json FROM topic_cache WHERE story_hash LIKE ?",
+        (f"{story_hash}%",)
     ).fetchone()
     
     if row and row["topic_json"]:

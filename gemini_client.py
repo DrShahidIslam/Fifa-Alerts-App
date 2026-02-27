@@ -79,3 +79,62 @@ def generate_content_with_fallback(
                 time.sleep(delay)
                 
     raise Exception("All Gemini API keys failed or exhausted quota.")
+
+def generate_image_with_fallback(
+    model, 
+    prompt, 
+    generation_config=None,
+    max_retries_per_key=3, 
+    base_delay=20
+):
+    """
+    Call Gemini API generate_images with exponential backoff on 429 errors.
+    """
+    keys = config.GEMINI_API_KEYS
+    if not keys:
+        raise ValueError("No Gemini API keys configured.")
+        
+    for key_idx, current_key in enumerate(keys):
+        client = genai.Client(api_key=current_key)
+        
+        for attempt in range(max_retries_per_key + 1):
+            try:
+                response = client.models.generate_images(
+                    model=model,
+                    prompt=prompt,
+                    config=generation_config
+                )
+                return response
+            except Exception as e:
+                error_str = str(e)
+                is_rate_limit = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+    
+                if not is_rate_limit:
+                    if key_idx == len(keys) - 1:
+                        raise
+                    logger.warning(f"  ⚠️ Error from key {key_idx + 1}: {e}. Trying next key...")
+                    break 
+                
+                if "limit: 0" in error_str or "PerDay" in error_str:
+                    logger.warning(f"  ⚠️ Gemini daily quota exhausted for key {key_idx + 1}/{len(keys)}.")
+                    break
+                
+                if key_idx < len(keys) - 1:
+                    logger.warning(f"  ⚠️ Gemini rate limited on key {key_idx + 1}, trying next key immediately...")
+                    break
+                
+                if attempt >= max_retries_per_key:
+                    logger.error(f"  ❌ Gemini API exhausted all {max_retries_per_key} retries on the last key.")
+                    raise
+                
+                delay = base_delay * (2 ** attempt)
+                retry_match = re.search(r'retry in ([\d.]+)s', error_str)
+                if retry_match:
+                    parsed_delay = float(retry_match.group(1))
+                    delay = max(delay, parsed_delay + 2)
+                    
+                logger.warning(f"  ⏳ Gemini rate limited on final key (attempt {attempt + 1}/{max_retries_per_key}). "
+                               f"Waiting {delay:.0f}s before retry...")
+                time.sleep(delay)
+                
+    raise Exception("All Gemini API keys failed or exhausted quota.")
