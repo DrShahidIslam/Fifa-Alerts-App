@@ -409,12 +409,12 @@ def _generate_and_preview_image(article_title):
     send_simple_message("🎨 Generating featured image... This may take a moment.")
 
     try:
-        image_path = generate_featured_image(article_title)
-        if image_path:
-            _pending_image_path = image_path
+        webp_path, jpg_path = generate_featured_image(article_title)
+        if webp_path and jpg_path:
+            _pending_image_path = webp_path  # We use WebP for WordPress uploading
             save_pending_state()
-            send_image_preview(image_path, article_title)
-            logger.info(f"🖼️ Image preview sent: {image_path}")
+            send_image_preview(jpg_path, article_title) # We use JPG for Telegram
+            logger.info(f"🖼️ Image preview sent (Telegram: {jpg_path}, WP: {webp_path})")
         else:
             send_simple_message("⚠️ Image generation failed. Article can still be published without an image.")
     except Exception as e:

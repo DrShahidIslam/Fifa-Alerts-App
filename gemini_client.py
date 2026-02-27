@@ -110,7 +110,7 @@ def generate_image_with_fallback(
                 is_rate_limit = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
     
                 if not is_rate_limit:
-                    if key_idx == len(keys) - 1:
+                    if "404" in error_str or key_idx == len(keys) - 1:
                         raise
                     logger.warning(f"  ⚠️ Error from key {key_idx + 1}: {e}. Trying next key...")
                     break 
