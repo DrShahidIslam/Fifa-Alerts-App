@@ -252,7 +252,10 @@ def check_and_handle_commands():
 
             if data.startswith("write_"):
                 answer_callback_query(callback_id, "✍️ Generating article...")
-                topic_hash = data.split("_", 1)[1] if "_" in data else None
+                if data == "write_article":
+                    topic_hash = None
+                else:
+                    topic_hash = data.split("_", 1)[1] if "_" in data else None
                 _handle_write_article(topic_hash)
             elif data == "approve":
                 answer_callback_query(callback_id, "✅ Publishing as draft...")
