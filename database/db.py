@@ -190,4 +190,5 @@ def cleanup_old_data(conn, days=7):
     old_cutoff = datetime.utcnow() - timedelta(days=14)
     conn.execute("DELETE FROM seen_stories WHERE first_seen_at < ?", (old_cutoff.isoformat(),))
     conn.execute("DELETE FROM notifications_sent WHERE sent_at < ?", (old_cutoff.isoformat(),))
+    conn.execute("DELETE FROM topic_cache WHERE recorded_at < ?", (old_cutoff.isoformat(),))
     conn.commit()

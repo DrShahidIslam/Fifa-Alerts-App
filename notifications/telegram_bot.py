@@ -84,7 +84,7 @@ def send_trending_alert(topic):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✍️ Generate (Queued)", "callback_data": cb_data},
+                {"text": "✍️ Generate (in next job)", "callback_data": cb_data},
                 {"text": "🚫 Ignore", "callback_data": "ignore"},
             ]
         ]
@@ -135,11 +135,11 @@ def send_article_preview(article_data):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✅ Approve Draft (Queued)", "callback_data": "approve"},
-                {"text": "🚀 Publish Live (Queued)", "callback_data": "publish_live"},
+                {"text": "✅ Approve Draft (in next job)", "callback_data": "approve"},
+                {"text": "🚀 Publish Live (in next job)", "callback_data": "publish_live"},
             ],
             [
-                {"text": "🔄 Regenerate", "callback_data": "write_article"},
+                {"text": "🔄 Regenerate (in next job)", "callback_data": "write_article"},
                 {"text": "🗑️ Reject", "callback_data": "reject"},
             ],
         ]
@@ -228,8 +228,8 @@ def send_image_preview(image_path, article_title):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✅ Use Image (Queued)", "callback_data": "approve_image"},
-                {"text": "🔄 Regenerate Image", "callback_data": "regenerate_image"},
+                {"text": "✅ Use Image (in next job)", "callback_data": "approve_image"},
+                {"text": "🔄 Regenerate Image (in next job)", "callback_data": "regenerate_image"},
             ],
             [
                 {"text": "🚫 Skip Image", "callback_data": "skip_image"},

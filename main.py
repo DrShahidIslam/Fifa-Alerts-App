@@ -173,6 +173,17 @@ def run_scan():
 
     for topic in trending_topics[:5]:  # Max 5 alerts per cycle to avoid spam
         try:
+            # Establish a single, consistent hash for the Telegram button AND the database cache
+            story_hash = topic.get("story_hash")
+            if not story_hash and topic.get("stories"):
+                story_hash = topic["stories"][0].get("story_hash")
+            
+            if not story_hash:
+                import hashlib
+                story_hash = hashlib.md5(topic["topic"].encode()).hexdigest()
+                
+            topic["story_hash"] = story_hash
+
             logger.info(f"\n📱 Sending alert: {topic['topic'][:80]}")
             logger.info(f"   Score: {topic['score']} | Sources: {', '.join(topic['sources'][:3])}")
 
@@ -181,21 +192,13 @@ def run_scan():
             if message_id:
                 alerts_sent += 1
                 # Record in database
-                topic_hash = ""
                 for story in topic.get("stories", []):
                     shash = story.get("story_hash", "")
                     if shash:
-                        topic_hash = shash
                         mark_notified(conn, shash)
                 
-                # Use the first story's hash, or a fallback, to cache the entire topic
-                if not topic_hash:
-                    import hashlib
-                    topic_hash = hashlib.md5(topic["topic"].encode()).hexdigest()
-                
-                topic["story_hash"] = topic_hash
-                save_topic_to_cache(conn, topic_hash, topic)
-                record_notification(conn, topic_hash, message_id)
+                save_topic_to_cache(conn, story_hash, topic)
+                record_notification(conn, story_hash, message_id)
                 logger.info(f"   ✅ Alert sent (Telegram ID: {message_id})")
             else:
                 logger.warning(f"   ⚠️ Failed to send alert")
