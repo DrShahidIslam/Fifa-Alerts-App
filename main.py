@@ -68,6 +68,9 @@ def load_pending_state():
                 state = json.load(f)
                 _pending_article = state.get("article")
                 _pending_image_path = state.get("image_path")
+                # Image file may not persist across runs (e.g. GitHub Actions); clear if missing
+                if _pending_image_path and not os.path.exists(_pending_image_path):
+                    _pending_image_path = None
                 return bool(_pending_article)
     except Exception as e:
         logger.error(f"Failed to load pending state: {e}")
@@ -395,12 +398,16 @@ def _handle_write_article(topic_hash=None):
     try:
         article = generate_article(topic)
         if article:
+            article["matched_keyword"] = topic.get("matched_keyword", "")  # For RankMath focus keyword
             _pending_article = article
             send_article_preview(article)
             logger.info(f"✅ Article preview sent: {article['title']}")
             save_pending_state()
-            # Auto-generate featured image after article is ready
-            _generate_and_preview_image(article.get("title", ""))
+            # Auto-generate featured image unless skipped (saves Gemini quota)
+            if not getattr(config, "SKIP_AI_IMAGE", False):
+                _generate_and_preview_image(article.get("title", ""))
+            else:
+                send_simple_message("🖼️ Image skipped (SKIP_AI_IMAGE=enabled). You can approve the article without a featured image.")
         else:
             send_simple_message("❌ Article generation failed. Try again later.")
     except Exception as e:
@@ -674,32 +681,55 @@ if __name__ == "__main__":
     elif args.once:
         logger.info("Running single scan and processing commands...")
 
-        # 1. Check for pending commands from previous runs
+        # 0. Load persisted state so pending callbacks can find topics (GitHub Actions restores cache)
+        global _latest_topics
         try:
-            check_and_handle_commands()
+            load_pending_state()
         except Exception as e:
-            logger.error(f"Command handler error before scan: {e}")
+            logger.debug(f"Could not load pending state: {e}")
+        try:
+            if os.path.exists("latest_topics.json"):
+                with open("latest_topics.json", "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, list) and loaded:
+                        _latest_topics = loaded
+                        logger.info(f"Loaded {len(_latest_topics)} topics from previous run")
+        except Exception as e:
+            logger.debug(f"Could not load latest topics: {e}")
+
+        # 1. Poll for pending callbacks FIRST (catches clicks from previous 30-min window)
+        logger.info("Checking for pending Telegram commands from previous runs...")
+        for _ in range(12):  # 2 min of checks before scan
+            try:
+                check_and_handle_commands()
+            except Exception as e:
+                logger.error(f"Command handler error: {e}")
+            time.sleep(10)
 
         # 2. Run the scan
         alerts = run_scan()
 
-        if alerts > 0:
-            logger.info("Alerts sent. Polling for commands for 2 minutes to provide instant feedback...")
-            end_time = time.time() + 120
-            while time.time() < end_time:
-                try:
-                    check_and_handle_commands()
-                except Exception as e:
-                    logger.error(f"Command handler error after scan: {e}")
-                time.sleep(3)
-        else:
-            # Poll one last time in case of a recent click
+        # 3. Poll for callbacks after scan — longer window so you can review & click
+        #    (alerts>0: 6 min | alerts=0: 2 min — covers approve/reject on previous article)
+        poll_seconds = 360 if alerts > 0 else 120
+        logger.info(f"Polling for commands for {poll_seconds//60} minutes...")
+        end_time = time.time() + poll_seconds
+        while time.time() < end_time:
             try:
                 check_and_handle_commands()
             except Exception as e:
                 logger.error(f"Command handler error after scan: {e}")
-                
-        # Final cleanup pass to acknowledge the last processed update
+            time.sleep(5)
+
+        # 4. Persist state for next run (critical for GitHub Actions cache)
+        save_pending_state()
+        try:
+            with open("latest_topics.json", "w", encoding="utf-8") as f:
+                json.dump(_latest_topics, f, default=str)
+        except Exception as e:
+            logger.error(f"Failed to save latest topics: {e}")
+
+        # 5. Acknowledge processed updates
         if _update_offset:
             try:
                 get_updates(offset=_update_offset)

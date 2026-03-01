@@ -1,9 +1,9 @@
 name: FIFA News Agent - Scan
 
 on:
-  # Run every 30 minutes
+  # Run every 45 minutes (fits free tier, gives time to review alerts)
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/45 * * * *'
 
   # Also allow manual trigger from GitHub UI
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -26,17 +26,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Restore agent database
+      - name: Restore agent state
         uses: actions/cache@v4
         with:
-          path: |
-            agent.db
-            pending_state.json
-            latest_topics.json
-          key: agent-db-${{ hashFiles('config.py') }}-v1
+          path: agent-state
+          key: fifa-agent-${{ hashFiles('config.py') }}-v2
           restore-keys: |
-            agent-db-${{ hashFiles('config.py') }}-
-            agent-db-
+            fifa-agent-${{ hashFiles('config.py') }}-
+            fifa-agent-
+
+      - name: Prepare state directory
+        run: |
+          mkdir -p agent-state
+          [ -f agent-state/agent.db ] && cp agent-state/agent.db . || true
+          [ -f agent-state/pending_state.json ] && cp agent-state/pending_state.json . || true
+          [ -f agent-state/latest_topics.json ] && cp agent-state/latest_topics.json . || true
 
       - name: Run news scan and handle commands
         env:
@@ -48,3 +52,10 @@ jobs:
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
         run: python main.py --once
+
+      - name: Save agent state
+        if: always()
+        run: |
+          cp -f agent.db agent-state/ 2>/dev/null || true
+          cp -f pending_state.json agent-state/ 2>/dev/null || true
+          cp -f latest_topics.json agent-state/ 2>/dev/null || true

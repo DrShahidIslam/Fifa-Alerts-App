@@ -84,50 +84,51 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 4. ARTICLE BODY: Magazine-quality HTML (design details below).
 5. FAQ: 3-4 schema-ready questions.
 
-─── HTML DESIGN & VISUAL HIERARCHY ───
+─── HTML DESIGN (Kadence Pro + RankMath compatible) ───
 
-**KEY FACTS BOX** — Directly after the intro paragraph:
-<div style="background: rgba(26, 26, 46, 0.7); border-left: 4px solid #e94560; border-radius: 8px; padding: 16px 20px; margin: 20px 0; color: #ffffff;">
-<h3 style="margin: 0 0 12px 0; font-size: 18px; color: #e94560; text-transform: uppercase; letter-spacing: 1px;">Key Facts</h3>
-<ul style="margin: 0; padding-left: 20px; line-height: 1.6;">
+Use semantic HTML that Kadence theme and Kadence Blocks will style correctly. Avoid heavy inline styles; let the theme handle appearance. Keep structure clear for RankMath and schema.
+
+**KEY FACTS BOX** — Directly after the intro paragraph. Use a simple div with class for Kadence compatibility:
+<div style="border-left: 4px solid #e94560; padding: 1rem 1.25rem; margin: 1.5rem 0; background: rgba(0,0,0,0.05); border-radius: 0 8px 8px 0;">
+<h3 style="margin: 0 0 0.75rem 0; font-size: 1.1rem;">Key Facts</h3>
+<ul style="margin: 0; padding-left: 1.25rem; line-height: 1.6;">
 <li>[Factual insight 1]</li>
 <li>[Factual insight 2]</li>
 <li>[Factual insight 3]</li>
 </ul>
 </div>
 
-**HEADINGS** — H2 sections with red accent:
-<h2 style="font-size: 24px; font-weight: 700; color: #ffffff; margin: 28px 0 12px 0; padding-bottom: 6px; border-bottom: 3px solid #e94560;">Section Title</h2>
+**HEADINGS** — Use proper H2/H3 hierarchy for SEO. Kadence will style them:
+<h2>Section Title</h2>
 
-**PULL QUOTES** — 1-2 quotes using source data:
-<blockquote style="border-left: 4px solid #e94560; margin: 24px 0; padding: 16px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 0 8px 8px 0; font-size: 19px; font-style: italic; color: #e0e0e0; line-height: 1.6;">
+**PULL QUOTES** — Use blockquote. Kadence wp-block-quote styling will apply:
+<blockquote>
 "Direct quote or critical statistical insight."
 </blockquote>
 
 **HIGHLIGHT BOX** — For breaking or critical info:
-<div style="background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 8px; padding: 16px 20px; margin: 20px 0;">
-<strong style="color: #ffda6a;">Important Update:</strong>
-<span style="color: #e0e0e0;"> High-value summary text.</span>
+<div style="padding: 1rem 1.25rem; margin: 1.5rem 0; border: 1px solid #ffc107; border-radius: 8px; background: rgba(255,193,7,0.08);">
+<strong>Important Update:</strong> High-value summary text.
 </div>
 
-**FAQ SECTION** — Structured for Answer Engines:
-<div style="margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
-<div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding: 16px 20px; background: rgba(0,0,0,0.2);">
-<h3 style="margin: 0 0 8px 0; font-size: 18px; color: #ffffff; font-weight: 600;">Question?</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #cccccc;">The direct, concise answer first, followed by detail.</p>
+**FAQ SECTION** — Semantic structure for RankMath FAQ schema. Use details/summary or simple divs:
+<div style="margin: 1.5rem 0; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+<div style="padding: 1rem 1.25rem; border-bottom: 1px solid rgba(0,0,0,0.1);">
+<h3 style="margin: 0 0 0.5rem 0;">Question?</h3>
+<p style="margin: 0;">The direct, concise answer first, followed by detail.</p>
 </div>
 </div>
 
-**CLOSING CTA** — Engagement gradient box:
-<div style="background: linear-gradient(135deg, #1a1a2e 0%, #0f172a 100%); border-radius: 12px; padding: 20px 24px; margin: 28px 0 16px 0; text-align: center; color: #ffffff; border: 1px solid rgba(255,255,255,0.1);">
-<p style="font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #ffffff;">Explore More on World Cup 2026</p>
-<p style="font-size: 15px; margin: 0; opacity: 0.9; color: #e0e0e0;">Stay ahead with the latest news and detailed guides for the upcoming tournament.</p>
+**CLOSING CTA** — Simple call-to-action. Keep minimal inline styles:
+<div style="text-align: center; padding: 1.5rem; margin: 1.5rem 0; border-radius: 8px; background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08);">
+<p style="margin: 0 0 0.5rem 0; font-weight: 600;">Explore More on World Cup 2026</p>
+<p style="margin: 0; font-size: 0.95rem;">Stay ahead with the latest news and guides for the tournament.</p>
 </div>
 
 INTERNAL LINKING RULES:
 - Include 2-3 natural internal links.
 - Use anchor text from the list below.
-- Style links: <a href="URL" style="color: #e94560; text-decoration: none; font-weight: 600; border-bottom: 2px solid #e94560;">anchor text</a>
+- Use clean links: <a href="URL">anchor text</a> (theme will style; avoid heavy inline link styles)
 Available pages:
 {links_suggestion}
 
