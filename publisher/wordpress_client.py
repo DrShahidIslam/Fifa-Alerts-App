@@ -265,25 +265,27 @@ def _set_rankmath_meta(post_id, article):
     }
 
     try:
-        response = requests.post(
+        # PATCH is the correct method for partial post update (meta only).
+        # Meta keys must be registered in WP (see deploy/rankmath-rest-snippet.php).
+        response = requests.request(
+            "PATCH",
             f"{API_BASE}/posts/{post_id}",
             json=rankmath_meta,
             auth=AUTH,
             headers=HEADERS,
-            timeout=TIMEOUT
+            timeout=TIMEOUT,
         )
 
         if response.status_code == 200:
-            logger.info(f"  ✅ RankMath SEO metadata set via standard meta (focus: '{focus_kw}')")
+            logger.info(f"  RankMath SEO metadata set (focus: '{focus_kw}')")
         else:
-            logger.warning(f"  ⚠️ RankMath meta update returned HTTP {response.status_code}")
-            
-            # Alternative: Try setting raw custom fields if the first method fails (common in restrictive WP setups)
-            # Many WP REST APIs don't allow arbitrary JSON 'meta' unless registered. 
-            pass
+            logger.warning(
+                f"  RankMath meta update returned HTTP {response.status_code}. "
+                "Add deploy/rankmath-rest-snippet.php to your theme's functions.php so meta is writable via REST."
+            )
 
     except Exception as e:
-        logger.warning(f"  ⚠️ RankMath meta update failed: {e}")
+        logger.warning(f"  RankMath meta update failed: {e}")
 
 def update_post_status(post_id, status="publish"):
     """Update a post's status (e.g., from draft to publish)."""

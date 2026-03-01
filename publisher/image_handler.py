@@ -179,6 +179,50 @@ def _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg):
     return None, None
 
 
+def _try_source_image(source_url, output_path_webp, output_path_jpg):
+    """Try to use the featured image from the source article (og:image or first large img). Returns (webp, jpg) or (None, None)."""
+    if not source_url or not source_url.startswith("http") or "trends.google" in source_url:
+        return None, None
+    try:
+        import requests
+        from urllib.parse import urljoin
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; FIFANewsAgent/1.0; +https://github.com/DrShahidIslam/Fifa-Alerts-App)"}
+        r = requests.get(source_url, headers=headers, timeout=12)
+        r.raise_for_status()
+        html = r.text
+        image_url = None
+        m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.I)
+        if m:
+            image_url = m.group(1).strip()
+        if not image_url:
+            m = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html, re.I)
+            if m:
+                image_url = m.group(1).strip()
+        if not image_url:
+            for m in re.finditer(r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>', html, re.I):
+                src = m.group(1).strip()
+                if "logo" in src.lower() or "avatar" in src.lower() or "icon" in src.lower():
+                    continue
+                image_url = src
+                break
+        if not image_url:
+            return None, None
+        image_url = urljoin(source_url, image_url)
+        img_r = requests.get(image_url, headers=headers, timeout=12)
+        img_r.raise_for_status()
+        image_bytes = img_r.content
+        if len(image_bytes) < 3000:
+            return None, None
+        result_webp = _compress_to_webp(image_bytes, output_path_webp)
+        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
+        if result_webp and result_jpg:
+            logger.info(f"    Image from source article: {result_webp}, {result_jpg}")
+            return result_webp, result_jpg
+    except Exception as e:
+        logger.warning(f"    Source image failed: {e}")
+    return None, None
+
+
 def _try_pollinations_image(article_title, output_path_webp, output_path_jpg):
     """Try to generate image via free Pollinations.ai. Returns (webp, jpg) or (None, None)."""
     import urllib.request
@@ -243,10 +287,10 @@ def _generate_placeholder_image(article_title, output_path_webp, output_path_jpg
         return None, None
 
 
-def generate_featured_image(article_title, save_dir=None):
+def generate_featured_image(article_title, save_dir=None, source_url=None):
     """
-    Generate a featured image: tries Pollinations (free) first, then optional Imagen (paid), then placeholder.
-    Compresses to WebP and JPEG under 100KB.
+    Generate a featured image. Order: Gemini Flash Image -> source article image (og:image) ->
+    Pollinations -> Imagen (if paid) -> placeholder. Compresses to WebP and JPEG under 100KB.
     """
     if save_dir is None:
         save_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images")
@@ -259,17 +303,23 @@ def generate_featured_image(article_title, save_dir=None):
 
     logger.info(f"  Generating featured image for: {article_title[:60]}")
 
-    # 1. Free tier: Gemini 2.5 Flash Image (same API key, ~500 images/day free)
+    # 1. Free tier: Gemini 2.5 Flash Image
     webp, jpg = _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg:
         return webp, jpg
 
-    # 2. Free: Pollinations
+    # 2. Free: use image from source article (og:image or first img) — relevant and no quota
+    if source_url:
+        webp, jpg = _try_source_image(source_url, output_path_webp, output_path_jpg)
+        if webp and jpg:
+            return webp, jpg
+
+    # 3. Free: Pollinations
     webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg:
         return webp, jpg
 
-    # 3. Paid tier only: Imagen (skip on free tier to avoid 400 errors)
+    # 4. Paid tier only: Imagen (skip on free tier to avoid 400 errors)
     if getattr(config, "USE_GEMINI_IMAGEN", False):
         try:
             prompt = build_image_prompt(article_title)
@@ -293,7 +343,7 @@ def generate_featured_image(article_title, save_dir=None):
         except Exception as e:
             logger.warning(f"    Imagen failed: {e}")
 
-    # 4. Placeholder (solid color + title text)
+    # 5. Placeholder (solid color + title text)
     logger.info("    Using placeholder image (title text)")
     return _generate_placeholder_image(article_title, output_path_webp, output_path_jpg)
 

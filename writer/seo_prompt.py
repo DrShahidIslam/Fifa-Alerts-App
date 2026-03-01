@@ -84,9 +84,31 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 4. ARTICLE BODY: Magazine-quality HTML (design details below).
 5. FAQ: 3-4 schema-ready questions.
 
+─── OUTPUT FORMAT: GUTENBERG BLOCKS (REQUIRED) ───
+
+The ARTICLE BODY must be valid **Gutenberg block markup** so WordPress and Kadence show proper blocks (better SEO and editor experience). Wrap every element in block comments as follows:
+
+- **Paragraphs:** <!-- wp:paragraph -->
+<p>Your text.</p>
+<!-- /wp:paragraph -->
+- **Headings:** <!-- wp:heading -->
+<h2>Section Title</h2>
+<!-- /wp:heading --> (or h3)
+- **Blockquotes:** <!-- wp:quote -->
+<blockquote><p>Quote text.</p></blockquote>
+<!-- /wp:quote -->
+- **Lists:** <!-- wp:list -->
+<ul><li>Item</li></ul>
+<!-- /wp:list -->
+- **Custom HTML (Key Facts box, FAQ, CTA divs):** <!-- wp:html -->
+<div>...</div>
+<!-- /wp:html -->
+
+Do NOT output raw HTML without block wrappers. Every paragraph, heading, blockquote, and standalone div must have its opening <!-- wp:... --> and closing <!-- /wp:... -->. This ensures the post uses blocks in the editor and works with Kadence Blocks.
+
 ─── HTML DESIGN (Kadence Pro + RankMath compatible) ───
 
-Use semantic HTML that Kadence theme and Kadence Blocks will style correctly. Avoid heavy inline styles; let the theme handle appearance. Keep structure clear for RankMath and schema.
+Use semantic HTML inside the blocks. Avoid heavy inline styles; let the theme handle appearance. Keep structure clear for RankMath and schema.
 
 **KEY FACTS BOX** — Directly after the intro paragraph. Use a simple div with class for Kadence compatibility:
 <div style="border-left: 4px solid #e94560; padding: 1rem 1.25rem; margin: 1.5rem 0; background: rgba(0,0,0,0.05); border-radius: 0 8px 8px 0;">
@@ -152,7 +174,7 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[Your full styled HTML article body here, starting with the first <p> tag. Include the Key Facts box, pull quotes, highlight boxes, and closing CTA as instructed above.]
+[Your full article body in GUTENBERG BLOCK MARKUP. Start with <!-- wp:paragraph --> and <p>...</p> and <!-- /wp:paragraph -->. Wrap every paragraph, heading, blockquote, list, and custom div in the correct wp: block comments as specified above. Include Key Facts box (in <!-- wp:html -->), pull quotes (<!-- wp:quote -->), highlight boxes (<!-- wp:html -->), and closing CTA (<!-- wp:html -->).]
 ---CONTENT_END---
 
 ---FAQ_START---

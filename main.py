@@ -399,13 +399,14 @@ def _handle_write_article(topic_hash=None):
         article = generate_article(topic)
         if article:
             article["matched_keyword"] = topic.get("matched_keyword", "")  # For RankMath focus keyword
+            article["source_url"] = topic.get("top_url") or (topic.get("stories") or [{}])[0].get("url") or ""
             _pending_article = article
             send_article_preview(article)
             logger.info(f"✅ Article preview sent: {article['title']}")
             save_pending_state()
-            # Auto-generate featured image unless skipped (saves Gemini quota)
+            # Auto-generate featured image unless skipped (Gemini -> source article image -> Pollinations -> placeholder)
             if not getattr(config, "SKIP_AI_IMAGE", False):
-                _generate_and_preview_image(article.get("title", ""))
+                _generate_and_preview_image(article.get("title", ""), article.get("source_url"))
             else:
                 send_simple_message("🖼️ Image skipped (SKIP_AI_IMAGE=enabled). You can approve the article without a featured image.")
         else:
@@ -421,7 +422,7 @@ def _handle_write_article(topic_hash=None):
             send_simple_message(f"❌ Error generating article: {error_str[:200]}")
 
 
-def _generate_and_preview_image(article_title):
+def _generate_and_preview_image(article_title, source_url=None):
     """Generate a featured image and send it to Telegram for approval."""
     global _pending_image_path
 
@@ -431,7 +432,7 @@ def _generate_and_preview_image(article_title):
     send_simple_message("🎨 Generating featured image... This may take a moment.")
 
     try:
-        webp_path, jpg_path = generate_featured_image(article_title)
+        webp_path, jpg_path = generate_featured_image(article_title, source_url=source_url)
         if webp_path and jpg_path:
             _pending_image_path = webp_path  # We use WebP for WordPress uploading
             save_pending_state()
@@ -453,7 +454,7 @@ def _handle_regenerate_image():
         return
 
     _pending_image_path = None
-    _generate_and_preview_image(_pending_article.get("title", ""))
+    _generate_and_preview_image(_pending_article.get("title", ""), _pending_article.get("source_url"))
 
 
 def _handle_approve(status="draft"):
