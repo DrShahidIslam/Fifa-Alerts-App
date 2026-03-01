@@ -251,7 +251,7 @@ def check_and_handle_commands():
             logger.info(f"📱 Received callback: {data}")
 
             if data.startswith("write_"):
-                answer_callback_query(callback_id, "✍️ Generating article...")
+                answer_callback_query(callback_id, "✍️ Processing request...")
                 if data == "write_article":
                     topic_hash = None
                 else:
@@ -323,6 +323,11 @@ def _handle_write_article(topic_hash=None):
 
     topic = None
     
+    # Check if we already have an article waiting for review
+    if _pending_article or load_pending_state():
+        send_simple_message(f"⚠️ An article is already pending review: '{(_pending_article or {}).get('title', 'Unknown')}'\n\nPlease ✅ Approve or 🗑️ Reject it before generating a new one.")
+        return
+
     # Prioritize loading the specific topic requested via Telegram callback
     if topic_hash:
         try:
@@ -331,16 +336,19 @@ def _handle_write_article(topic_hash=None):
             conn.close()
             if topic:
                 logger.info(f"Loaded specific topic {topic_hash} from cache.")
+            else:
+                logger.warning(f"Topic hash {topic_hash} not found in cache.")
+                send_simple_message("⚠️ This alert is too old (cache expired) or the topic record is no longer available.")
+                return
         except Exception as e:
             logger.error(f"Error loading topic {topic_hash} from cache: {e}")
 
-    # Fallbacks if it wasn't a callback or the cache was cleared
-    if not topic:
+    # If no specific hash was provided (e.g. /write_article command), find the best candidate
+    if not topic and not topic_hash:
         if _latest_topics:
             topic = _latest_topics[0]
         else:
             # Reconstruct from disk if running in isolated environment (e.g., GitHub Actions)
-            # We use a local JSON file now because DB 'notifications_sent' might be empty if Telegram timed out.
             try:
                 if os.path.exists("latest_topics.json"):
                     with open("latest_topics.json", "r", encoding="utf-8") as f:
@@ -377,7 +385,7 @@ def _handle_write_article(topic_hash=None):
         send_simple_message("⚠️ No trending topics found in memory or database. Wait for the next scan.")
         return
 
-    _article_attempted_this_run = True  # Mark as attempted before trying
+    _article_attempted_this_run = True  # Keep for logging purposes, but no longer blocking
 
     logger.info(f"📝 Generating article for: {topic['topic']}")
 
