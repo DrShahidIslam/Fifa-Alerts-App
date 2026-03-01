@@ -167,6 +167,8 @@ ARTICLE_MAX_WORDS = 1500
 GEMINI_MODEL = "gemini-2.5-flash"
 # Set to True to skip AI image generation (saves Gemini quota; article publishes without featured image)
 SKIP_AI_IMAGE = os.getenv("SKIP_AI_IMAGE", "false").lower() in ("true", "1", "yes")
+# Imagen is paid-only; set True only if you have a paid Gemini plan. Free tier uses Pollinations + placeholder.
+USE_GEMINI_IMAGEN = os.getenv("USE_GEMINI_IMAGEN", "false").lower() in ("true", "1", "yes")
 
 # ── Logging ───────────────────────────────────────────────────────────
 LOG_FILE = "agent.log"

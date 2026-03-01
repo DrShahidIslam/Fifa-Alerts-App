@@ -480,7 +480,10 @@ def _handle_approve(status="draft"):
             _pending_image_path = None
             save_pending_state()
         else:
-            send_simple_message("❌ WordPress publishing failed. Check your WP credentials.")
+            send_simple_message(
+                "❌ WordPress publishing failed. Check WP credentials and that your host allows the REST API "
+                "(some firewalls or security plugins block requests from GitHub Actions)."
+            )
     except Exception as e:
         logger.error(f"WordPress publish error: {e}")
         send_simple_message(f"❌ Publishing error: {str(e)[:200]}")
@@ -583,59 +586,59 @@ def run_listen_loop():
 
 def test_all_connections():
     """Test all API connections and report status."""
-    print("🔍 Testing all connections...\n")
+    print("Testing all connections...\n")
 
     # Telegram
-    print("1️⃣  Telegram Bot:")
+    print("1. Telegram Bot:")
     ok, name = test_connection()
     if ok:
-        print(f"   ✅ Connected as @{name}")
-        mid = send_simple_message("🧪 Connection test successful! Your FIFA News Agent is ready.")
-        print(f"   ✅ Test message sent (ID: {mid})")
+        print(f"   [OK] Connected as @{name}")
+        mid = send_simple_message("Connection test successful! Your FIFA News Agent is ready.")
+        print(f"   [OK] Test message sent (ID: {mid})")
     else:
-        print("   ❌ FAILED — Check TELEGRAM_BOT_TOKEN in .env")
+        print("   [FAIL] Check TELEGRAM_BOT_TOKEN in .env")
 
     # NewsAPI
-    print("\n2️⃣  NewsAPI:")
+    print("\n2. NewsAPI:")
     try:
         from newsapi import NewsApiClient
         newsapi = NewsApiClient(api_key=config.NEWS_API_KEY)
         result = newsapi.get_top_headlines(q="football", language="en", page_size=1)
         if result.get("status") == "ok":
-            print(f"   ✅ Connected — {result.get('totalResults', 0)} results available")
+            print(f"   [OK] Connected - {result.get('totalResults', 0)} results available")
         else:
-            print(f"   ❌ FAILED — {result}")
+            print(f"   [FAIL] {result}")
     except Exception as e:
-        print(f"   ❌ FAILED — {e}")
+        print(f"   [FAIL] {e}")
 
     # RSS Feeds
-    print("\n3️⃣  RSS Feeds:")
+    print("\n3. RSS Feeds:")
     import feedparser
     for name, url in list(config.RSS_FEEDS.items())[:3]:
         try:
             feed = feedparser.parse(url)
             if feed.entries:
-                print(f"   ✅ {name}: {len(feed.entries)} entries")
+                print(f"   [OK] {name}: {len(feed.entries)} entries")
             else:
-                print(f"   ⚠️ {name}: No entries (feed may be empty or blocked)")
+                print(f"   [WARN] {name}: No entries (feed may be empty or blocked)")
         except Exception as e:
-            print(f"   ❌ {name}: {e}")
+            print(f"   [FAIL] {name}: {e}")
 
     # Google Trends
-    print("\n4️⃣  Google Trends:")
+    print("\n4. Google Trends:")
     try:
         from pytrends.request import TrendReq
         pytrends = TrendReq(hl='en-US', tz=0, timeout=(10, 30))
         trending = pytrends.trending_searches(pn='united_states')
         if trending is not None and not trending.empty:
-            print(f"   ✅ Connected — {len(trending)} trending searches found")
+            print(f"   [OK] Connected - {len(trending)} trending searches found")
         else:
-            print("   ⚠️ Connected but no trending data returned")
+            print("   [WARN] Connected but no trending data returned")
     except Exception as e:
-        print(f"   ❌ FAILED — {e}")
+        print(f"   [FAIL] {e}")
 
     # WordPress
-    print("\n5️⃣  WordPress REST API:")
+    print("\n5. WordPress REST API:")
     try:
         import requests
         resp = requests.get(
@@ -645,26 +648,26 @@ def test_all_connections():
         )
         if resp.status_code == 200:
             cats = [c["name"] for c in resp.json()]
-            print(f"   ✅ Connected — Categories: {', '.join(cats[:5])}")
+            print(f"   [OK] Connected - Categories: {', '.join(cats[:5])}")
         else:
-            print(f"   ❌ FAILED — HTTP {resp.status_code}")
+            print(f"   [FAIL] HTTP {resp.status_code}")
     except Exception as e:
-        print(f"   ❌ FAILED — {e}")
+        print(f"   [FAIL] {e}")
 
     # Gemini API
-    print("\n6️⃣  Google Gemini API:")
+    print("\n6. Google Gemini API:")
     try:
         response = generate_content_with_fallback(
             model=config.GEMINI_MODEL,
             contents="Say 'API connected' in exactly two words.",
             max_retries_per_key=1
         )
-        print(f"   ✅ Connected — Response: {response.text.strip()}")
+        print(f"   [OK] Connected - Response: {response.text.strip()}")
     except Exception as e:
-        print(f"   ❌ FAILED — {e}")
+        print(f"   [FAIL] {e}")
 
     print("\n" + "=" * 40)
-    print("✅ Connection test complete!")
+    print("Connection test complete!")
 
 
 if __name__ == "__main__":

@@ -80,6 +80,59 @@ def generate_content_with_fallback(
                 
     raise Exception("All Gemini API keys failed or exhausted quota.")
 
+
+def generate_image_with_gemini_flash(prompt, max_retries_per_key=2, base_delay=10):
+    """
+    Generate an image using Gemini 2.5 Flash Image (free tier). Uses generate_content with
+    response_modalities including IMAGE. Returns response or None; caller extracts image from
+    response.candidates[0].content.parts (part.inline_data.data).
+    """
+    try:
+        from google.genai.types import GenerateContentConfig, Modality
+    except ImportError:
+        from google.genai import types
+        GenerateContentConfig = getattr(types, "GenerateContentConfig", None)
+        Modality = getattr(types, "Modality", None)
+        if GenerateContentConfig is None or Modality is None:
+            logger.warning("  Could not import GenerateContentConfig/Modality for Gemini Flash Image")
+            return None
+
+    keys = config.GEMINI_API_KEYS
+    if not keys:
+        return None
+
+    contents = f"Generate a single photorealistic editorial image for a sports news article. No text or captions in the image. Topic: {prompt}"
+    config_obj = GenerateContentConfig(
+        response_modalities=[Modality.TEXT, Modality.IMAGE],
+    )
+
+    for key_idx, current_key in enumerate(keys):
+        client = genai.Client(api_key=current_key)
+        for attempt in range(max_retries_per_key + 1):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash-image",
+                    contents=contents,
+                    config=config_obj,
+                )
+                return response
+            except Exception as e:
+                error_str = str(e)
+                if "404" in error_str or "not found" in error_str.lower():
+                    logger.warning(f"  Gemini image model not available: {e}")
+                    return None
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    if attempt >= max_retries_per_key:
+                        return None
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+                if key_idx < len(keys) - 1:
+                    break
+                logger.warning(f"  Gemini Flash Image failed: {e}")
+                return None
+    return None
+
+
 def generate_image_with_fallback(
     model, 
     prompt, 

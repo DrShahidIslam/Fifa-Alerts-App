@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import json
+import time
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -19,8 +20,11 @@ logger = logging.getLogger(__name__)
 API_BASE = f"{config.WP_URL}/wp-json/wp/v2"
 AUTH = HTTPBasicAuth(config.WP_USERNAME, config.WP_APP_PASSWORD)
 TIMEOUT = 30
+RETRY_DELAY = 5  # seconds between retries on 502/503
+# User-Agent and Referer avoid Wordfence "Block IPs who send POST with blank User-Agent and Referer"
 HEADERS = {
-    "User-Agent": "FIFANewsAgent/1.0"
+    "User-Agent": "FIFANewsAgent/1.0 (WordPress REST)",
+    "Referer": f"{config.WP_URL}/",
 }
 
 
@@ -58,7 +62,7 @@ def create_post(article, featured_image_path=None, status=None):
         if tag_id:
             tag_ids.append(tag_id)
 
-    # ── Step 4: Create the post ───────────────────────────────────
+    # ── Step 4: Create the post (with retry on 502/503) ───────────
     post_data = {
         "title": article.get("title", "Untitled"),
         "content": article.get("full_content", article.get("content", "")),
@@ -74,34 +78,41 @@ def create_post(article, featured_image_path=None, status=None):
         post_data["featured_media"] = media_id
 
     try:
-        response = requests.post(
-            f"{API_BASE}/posts",
-            json=post_data,
-            auth=AUTH,
-            headers=HEADERS,
-            timeout=TIMEOUT
-        )
+        for attempt in range(2):
+            response = requests.post(
+                f"{API_BASE}/posts",
+                json=post_data,
+                auth=AUTH,
+                headers=HEADERS,
+                timeout=TIMEOUT,
+            )
+            if response.status_code in (200, 201):
+                result = response.json()
+                post_id = result.get("id")
+                post_url = result.get("link", "")
 
-        if response.status_code in (200, 201):
-            result = response.json()
-            post_id = result.get("id")
-            post_url = result.get("link", "")
+                logger.info(f"  ✅ Post created (ID: {post_id}, Status: {status})")
+                logger.info(f"  🔗 URL: {post_url}")
 
-            logger.info(f"  ✅ Post created (ID: {post_id}, Status: {status})")
-            logger.info(f"  🔗 URL: {post_url}")
+                # ── Step 5: Set RankMath SEO fields ─────────────────────
+                _set_rankmath_meta(post_id, article)
 
-            # ── Step 5: Set RankMath SEO fields ─────────────────────
-            _set_rankmath_meta(post_id, article)
+                return {
+                    "post_id": post_id,
+                    "post_url": post_url,
+                    "status": status,
+                }
+            if response.status_code in (502, 503) and attempt == 0:
+                logger.warning(f"  ⚠️ WordPress returned {response.status_code}, retrying in {RETRY_DELAY}s...")
+                time.sleep(RETRY_DELAY)
+                continue
+            break
 
-            return {
-                "post_id": post_id,
-                "post_url": post_url,
-                "status": status,
-            }
-        else:
-            logger.error(f"  ❌ Post creation failed: HTTP {response.status_code}")
-            logger.error(f"     Response: {response.text[:500]}")
-            return None
+        logger.error(f"  ❌ Post creation failed: HTTP {response.status_code}")
+        logger.error(f"     Response: {response.text[:500]}")
+        if response.status_code == 403:
+            logger.error("     Tip: 403 often means firewall/plugin blocking. Whitelist GitHub Actions IPs or allow REST API.")
+        return None
 
     except Exception as e:
         logger.error(f"  ❌ Post creation error: {e}")
@@ -110,7 +121,7 @@ def create_post(article, featured_image_path=None, status=None):
 
 def upload_media(file_path, title=""):
     """
-    Upload an image file to WordPress media library.
+    Upload an image file to WordPress media library. Retries once on 502/503.
 
     Returns:
         int: media ID, or None if failed
@@ -127,33 +138,36 @@ def upload_media(file_path, title=""):
             "Content-Type": mime_type,
         })
 
-        response = requests.post(
-            f"{API_BASE}/media",
-            data=file_data,
-            headers=headers,
-            auth=AUTH,
-            timeout=60
-        )
+        for attempt in range(2):
+            response = requests.post(
+                f"{API_BASE}/media",
+                data=file_data,
+                headers=headers,
+                auth=AUTH,
+                timeout=60,
+            )
+            if response.status_code in (200, 201):
+                media_id = response.json().get("id")
+                logger.info(f"  ✅ Image uploaded (Media ID: {media_id})")
 
-        if response.status_code in (200, 201):
-            media_id = response.json().get("id")
-            logger.info(f"  ✅ Image uploaded (Media ID: {media_id})")
+                if title:
+                    requests.post(
+                        f"{API_BASE}/media/{media_id}",
+                        json={"alt_text": title[:125]},
+                        auth=AUTH,
+                        headers=HEADERS,
+                        timeout=15,
+                    )
+                return media_id
+            if response.status_code in (502, 503) and attempt == 0:
+                logger.warning(f"  ⚠️ Media upload {response.status_code}, retrying in {RETRY_DELAY}s...")
+                time.sleep(RETRY_DELAY)
+                continue
+            break
 
-            # Set alt text
-            if title:
-                requests.post(
-                    f"{API_BASE}/media/{media_id}",
-                    json={"alt_text": title[:125]},
-                    auth=AUTH,
-                    headers=HEADERS,
-                    timeout=15
-                )
-
-            return media_id
-        else:
-            logger.error(f"  ❌ Media upload failed: HTTP {response.status_code}")
-            logger.error(f"     {response.text[:300]}")
-            return None
+        logger.error(f"  ❌ Media upload failed: HTTP {response.status_code}")
+        logger.error(f"     {response.text[:300]}")
+        return None
 
     except Exception as e:
         logger.error(f"  ❌ Media upload error: {e}")
