@@ -313,6 +313,7 @@ def _handle_write_article(topic_hash=None):
     # This prevents multiple stale callbacks from triggering repeated failures
     if _article_attempted_this_run:
         logger.info("⏭️ Skipping duplicate write_article — already attempted this run")
+        send_simple_message("✍️ An article generation is already in progress or was just attempted. Please wait a moment.")
         return
 
     # Don't attempt generation if we already know the quota is exhausted
@@ -521,6 +522,8 @@ def run_agent_loop():
             logger.info(f"SCAN #{scan_count}")
             logger.info(f"{'=' * 60}")
 
+            global _article_attempted_this_run
+            _article_attempted_this_run = False
             alerts = run_scan()
 
             # Check for commands after each scan
@@ -559,6 +562,8 @@ def run_listen_loop():
 
     while True:
         try:
+            global _article_attempted_this_run
+            _article_attempted_this_run = False
             check_and_handle_commands()
             time.sleep(2)  # Poll every 2 seconds
         except KeyboardInterrupt:
