@@ -29,18 +29,14 @@ jobs:
       - name: Restore agent state
         uses: actions/cache@v4
         with:
-          path: agent-state
+          path: |
+            agent.db
+            pending_state.json
+            latest_topics.json
           key: fifa-agent-${{ hashFiles('config.py') }}-v2
           restore-keys: |
             fifa-agent-${{ hashFiles('config.py') }}-
             fifa-agent-
-
-      - name: Prepare state directory
-        run: |
-          mkdir -p agent-state
-          [ -f agent-state/agent.db ] && cp agent-state/agent.db . || true
-          [ -f agent-state/pending_state.json ] && cp agent-state/pending_state.json . || true
-          [ -f agent-state/latest_topics.json ] && cp agent-state/latest_topics.json . || true
 
       - name: Run news scan and handle commands
         env:
@@ -52,10 +48,3 @@ jobs:
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
         run: python main.py --once
-
-      - name: Save agent state
-        if: always()
-        run: |
-          cp -f agent.db agent-state/ 2>/dev/null || true
-          cp -f pending_state.json agent-state/ 2>/dev/null || true
-          cp -f latest_topics.json agent-state/ 2>/dev/null || true
