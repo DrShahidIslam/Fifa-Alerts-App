@@ -682,7 +682,6 @@ if __name__ == "__main__":
         logger.info("Running single scan and processing commands...")
 
         # 0. Load persisted state so pending callbacks can find topics (GitHub Actions restores cache)
-        global _latest_topics
         try:
             load_pending_state()
         except Exception as e:
