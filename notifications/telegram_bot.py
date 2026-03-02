@@ -92,9 +92,21 @@ def send_trending_alert(topic):
     return _send_message(message, reply_markup=keyboard)
 
 
-def send_simple_message(text):
-    """Send a simple text message (no markdown)."""
-    return _send_message(text)
+def send_simple_message(text, reply_markup=None):
+    """Send a simple text message (no markdown). Optionally with inline keyboard."""
+    return _send_message(text, reply_markup=reply_markup)
+
+
+def send_pending_reminder(title):
+    """Send a reminder that an article is pending, with buttons to show or clear it."""
+    text = f"⚠️ An article is already pending review: '{title}'\n\nPlease ✅ Approve or 🗑️ Reject it before generating a new one."
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📋 Show pending article", "callback_data": "show_pending"}],
+            [{"text": "🗑️ Clear pending", "callback_data": "clear_pending"}],
+        ]
+    }
+    return _send_message(text, reply_markup=keyboard)
 
 
 def send_status_update(status_text):

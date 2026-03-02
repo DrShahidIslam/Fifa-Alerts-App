@@ -29,7 +29,7 @@ from detection.spike_detector import detect_spikes
 from notifications.telegram_bot import (
     send_trending_alert, send_simple_message, send_status_update,
     send_article_preview, send_publish_confirmation, send_generating_status,
-    send_image_preview, get_updates, answer_callback_query, test_connection
+    send_image_preview, send_pending_reminder, get_updates, answer_callback_query, test_connection
 )
 from database.db import get_connection, cleanup_old_data, mark_notified, record_notification, save_topic_to_cache, get_topic_from_cache
 from writer.article_generator import generate_article
@@ -289,6 +289,12 @@ def check_and_handle_commands():
                 _handle_publish_draft(post_id)
             elif data == "ignore":
                 answer_callback_query(callback_id, "👍 Ignored.")
+            elif data == "show_pending":
+                answer_callback_query(callback_id, "📋 Sending pending article...")
+                _handle_show_pending()
+            elif data == "clear_pending":
+                answer_callback_query(callback_id, "🗑️ Cleared.")
+                _handle_clear_pending()
             continue
 
         # Handle text commands
@@ -306,6 +312,10 @@ def check_and_handle_commands():
             _pending_image_path = None
             save_pending_state()
             send_simple_message("🗑️ Article discarded.")
+        elif text.startswith("/show_pending") or text.startswith("/pending"):
+            _handle_show_pending()
+        elif text.startswith("/clear_pending") or text.startswith("/clear"):
+            _handle_clear_pending()
 
 
 def _handle_write_article(topic_hash=None):
@@ -329,7 +339,7 @@ def _handle_write_article(topic_hash=None):
     
     # Check if we already have an article waiting for review
     if _pending_article or load_pending_state():
-        send_simple_message(f"⚠️ An article is already pending review: '{(_pending_article or {}).get('title', 'Unknown')}'\n\nPlease ✅ Approve or 🗑️ Reject it before generating a new one.")
+        send_pending_reminder((_pending_article or {}).get("title", "Unknown"))
         return
 
     # Prioritize loading the specific topic requested via Telegram callback
@@ -489,11 +499,38 @@ def _handle_approve(status="draft"):
         logger.error(f"WordPress publish error: {e}")
         send_simple_message(f"❌ Publishing error: {str(e)[:200]}")
 
+def _handle_show_pending():
+    """Resend the pending article preview (and image if available) so the user can see it."""
+    global _pending_article, _pending_image_path
+    if not _pending_article and not load_pending_state():
+        send_simple_message("No article pending. Generate one from a trending alert (✍️ Generate Article).")
+        return
+    send_simple_message("📋 Here’s the pending article:")
+    send_article_preview(_pending_article)
+    if _pending_image_path and os.path.exists(_pending_image_path):
+        send_image_preview(_pending_image_path, _pending_article.get("title", ""))
+    else:
+        send_simple_message("(Featured image was from a previous run and is no longer available; you can still Approve or Skip image.)")
+
+
+def _handle_clear_pending():
+    """Clear the pending article and image so the user can generate a new one."""
+    global _pending_article, _pending_image_path
+    if not _pending_article and not load_pending_state():
+        send_simple_message("Nothing to clear. No article is pending.")
+        return
+    title = (_pending_article or {}).get("title", "Article")
+    _pending_article = None
+    _pending_image_path = None
+    save_pending_state()
+    send_simple_message(f"Pending article cleared: '{title}'. You can now generate a new one from a trending alert.")
+
+
 def _handle_publish_draft(post_id):
     """Publish an existing draft on WordPress."""
     from publisher.wordpress_client import update_post_status
-    
-    logger.info(f"🚀 Publishing draft (ID: {post_id})")
+
+    logger.info(f"Publishing draft (ID: {post_id})")
     try:
         url = update_post_status(post_id, "publish")
         if url:
