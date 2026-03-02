@@ -400,9 +400,14 @@ def _update_status_via_webhook(post_id, status="publish"):
             timeout=30,
         )
         if r.status_code == 200:
-            data = r.json()
+            try:
+                data = r.json()
+            except ValueError:
+                logger.error(f"Publish draft webhook: response not JSON: {r.text[:200]}")
+                return None
             if data.get("success"):
                 return data.get("post_url")
+        logger.warning(f"Publish draft webhook: HTTP {r.status_code} - {r.text[:300]}")
         return None
     except Exception as e:
         logger.warning(f"Webhook status update failed: {e}")

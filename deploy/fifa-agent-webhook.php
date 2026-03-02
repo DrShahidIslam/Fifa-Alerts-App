@@ -11,6 +11,9 @@
  * 3. Set WP_PUBLISH_WEBHOOK_URL in your .env to https://yoursite.com/fifa-publish-abc12xyz.php
  * 4. In wp-config.php add: define('FIFA_AGENT_WEBHOOK_SECRET', 'your-long-random-secret');
  *    Use the same value for WP_PUBLISH_SECRET in the agent's .env.
+ * 5. Optional — set the WordPress user used as post author and for publish_draft:
+ *    define('FIFA_AGENT_WEBHOOK_AUTHOR', 'Simon');  // by login name
+ *    or define('FIFA_AGENT_WEBHOOK_USER_ID', 2);     // by user ID (default 1)
  *
  * SECURITY: Only requests with the correct X-FIFA-Agent-Token are accepted.
  */
@@ -45,6 +48,17 @@ if (!is_file($wp_load)) {
 }
 require_once $wp_load;
 
+// Author for new posts and for publish_draft (must be able to edit posts). Default 1.
+$webhook_author_id = 1;
+if (defined('FIFA_AGENT_WEBHOOK_USER_ID')) {
+    $webhook_author_id = (int) FIFA_AGENT_WEBHOOK_USER_ID;
+} elseif (defined('FIFA_AGENT_WEBHOOK_AUTHOR')) {
+    $u = get_user_by('login', FIFA_AGENT_WEBHOOK_AUTHOR);
+    if ($u) {
+        $webhook_author_id = (int) $u->ID;
+    }
+}
+
 $secret = isset($_SERVER['HTTP_X_FIFA_AGENT_TOKEN']) ? $_SERVER['HTTP_X_FIFA_AGENT_TOKEN'] : '';
 $expected = defined('FIFA_AGENT_WEBHOOK_SECRET') ? FIFA_AGENT_WEBHOOK_SECRET : '';
 if ($expected === '' || $secret !== $expected) {
@@ -58,14 +72,20 @@ if (!empty($data['action']) && $data['action'] === 'publish_draft' && isset($dat
     $post_id = (int) $data['post_id'];
     $new_status = isset($data['status']) && in_array($data['status'], ['draft', 'pending', 'publish'], true) ? $data['status'] : 'publish';
     if ($post_id > 0) {
+        // Webhook runs with no logged-in user; WordPress blocks wp_update_post. Use the configured author.
+        wp_set_current_user($webhook_author_id);
         $updated = wp_update_post(['ID' => $post_id, 'post_status' => $new_status], true);
-        if (!is_wp_error($updated)) {
+        if (!is_wp_error($updated) && $updated > 0) {
             echo json_encode(['success' => true, 'post_id' => $post_id, 'post_url' => get_permalink($post_id), 'status' => $new_status]);
             exit;
         }
+        $err_msg = is_wp_error($updated) ? $updated->get_error_message() : 'Update returned 0';
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $err_msg]);
+        exit;
     }
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Invalid post_id or update failed']);
+    echo json_encode(['success' => false, 'message' => 'Invalid post_id']);
     exit;
 }
 
@@ -145,7 +165,7 @@ $post_arr = [
     'post_name'    => $slug,
     'post_status'  => $status,
     'post_type'    => 'post',
-    'post_author'  => 1,
+    'post_author'  => $webhook_author_id,
     'comment_status' => 'open',
 ];
 $post_id = wp_insert_post($post_arr, true);

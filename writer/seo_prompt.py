@@ -86,8 +86,14 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 
 ─── OUTPUT FORMAT: GUTENBERG BLOCKS (REQUIRED) ───
 
-The ARTICLE BODY must be valid **Gutenberg block markup** so WordPress and Kadence show proper blocks (better SEO and editor experience). Wrap every element in block comments as follows:
+**1. WRAP THE ENTIRE ARTICLE BODY in a Group block with medium padding** (so the whole text has spacing below the featured image). Start the ARTICLE BODY with:
+<!-- wp:group {{"style":{{"spacing":{{"padding":{{"top":"1.5rem","right":"1.5rem","bottom":"1.5rem","left":"1.5rem"}}}}}}}} -->
+<div class="wp-block-group" style="padding:1.5rem">
+Then place all your blocks inside, and close with:
+</div>
+<!-- /wp:group -->
 
+**2. Wrap every element** in block comments as follows:
 - **Paragraphs:** <!-- wp:paragraph -->
 <p>Your text.</p>
 <!-- /wp:paragraph -->
@@ -178,9 +184,9 @@ CATEGORY: News
 ---CONTENT_END---
 
 ---FAQ_START---
-[Your styled FAQ HTML here using the accordion format above]
+[Your styled FAQ content in Gutenberg blocks. Use <!-- wp:heading --> for "Frequently Asked Questions", then <!-- wp:html --> for each FAQ div. Then put the JSON-LD schema in a SEPARATE Custom HTML block so it is NOT visible as text — only for search engines:]
 
-<!-- IMPORTANT: Include standard JSON-LD schema for these FAQs immediately after the FAQ HTML -->
+<!-- wp:html -->
 <script type="application/ld+json">
 {{
   "@context": "https://schema.org",
@@ -197,6 +203,7 @@ CATEGORY: News
   ]
 }}
 </script>
+<!-- /wp:html -->
 ---FAQ_END---
 """
 

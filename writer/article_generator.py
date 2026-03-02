@@ -156,6 +156,42 @@ def generate_article(topic, source_urls=None):
     return article
 
 
+def _ensure_schema_in_html_block(faq_html):
+    """Wrap any JSON-LD script in faq_html inside <!-- wp:html --> so it doesn't display as text."""
+    if not faq_html or "<script" not in faq_html:
+        return faq_html
+    # If already inside wp:html block, leave as is
+    if "<!-- wp:html -->" in faq_html and "application/ld+json" in faq_html:
+        return faq_html
+    # Find <script type="application/ld+json">...</script>
+    script_match = re.search(
+        r'(<script\s+type=["\']application/ld\+json["\']\s*>)(.*?)(</script>)',
+        faq_html, re.DOTALL | re.IGNORECASE
+    )
+    if not script_match:
+        return faq_html
+    prefix, json_content, suffix = script_match.group(1), script_match.group(2), script_match.group(3)
+    script_full = prefix + json_content + suffix
+    # Remove the raw script from faq_html and append it wrapped in wp:html
+    faq_without_script = faq_html.replace(script_full, "").strip()
+    # Remove resulting double newlines or empty blocks
+    faq_without_script = re.sub(r'\n{3,}', '\n\n', faq_without_script)
+    wrapped = '<!-- wp:html -->\n' + script_full + '\n<!-- /wp:html -->'
+    return (faq_without_script + "\n\n" + wrapped).strip() if faq_without_script else wrapped
+
+
+def _wrap_content_with_padding(content):
+    """Wrap article content in a Group block with medium padding (1.5rem) for Kadence."""
+    if not content or "wp:group" in content.strip()[:250]:
+        return content
+    return (
+        '<!-- wp:group {"style":{"spacing":{"padding":{"top":"1.5rem","right":"1.5rem","bottom":"1.5rem","left":"1.5rem"}}}} -->\n'
+        '<div class="wp-block-group" style="padding:1.5rem">\n\n'
+        + content.strip() + "\n\n"
+        + '</div>\n<!-- /wp:group -->'
+    )
+
+
 def _parse_article_output(raw_text):
     """
     Parse the structured output from Gemini into article components.
@@ -195,11 +231,18 @@ def _parse_article_output(raw_text):
         faq_match = re.search(r'---FAQ_START---(.*?)---FAQ_END---', raw_text, re.DOTALL)
         result["faq_html"] = faq_match.group(1).strip() if faq_match else ""
 
-        # Combine content + FAQ
+        # Ensure JSON-LD schema is inside a Custom HTML block so it doesn't display as text
+        result["faq_html"] = _ensure_schema_in_html_block(result["faq_html"])
+
+        # Combine content + FAQ (optionally wrap content in Group block for padding if missing)
+        content = result["content"]
+        if "wp:group" not in content.strip()[:250]:
+            content = _wrap_content_with_padding(content)
         if result["faq_html"]:
-            result["full_content"] = result["content"] + "\n\n<h2>Frequently Asked Questions</h2>\n" + result["faq_html"]
+            result["full_content"] = content + "\n\n<!-- wp:heading -->\n<h2>Frequently Asked Questions</h2>\n<!-- /wp:heading -->\n\n" + result["faq_html"]
         else:
-            result["full_content"] = result["content"]
+            result["full_content"] = content
+        result["content"] = content
 
         # Validate we got essential fields
         if not result["title"] or not result["content"]:
