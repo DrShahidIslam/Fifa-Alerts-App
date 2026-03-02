@@ -1,26 +1,51 @@
 """
 SEO Prompt Template — Master prompt used for Gemini article generation.
 Enforces SEO best practices, your site's editorial style, and internal linking.
+All URLs below are real pages on fifa-worldcup26.com; do not add or invent others.
 """
 
-# Internal pages on fifa-worldcup26.com for natural linking
+# Real internal links only (from site). Add new blog posts here as they are published.
+# Model must ONLY use links from this list; never hallucinate URLs.
 INTERNAL_LINKS = {
+    # Main / hub pages
+    "home": {"url": "https://fifa-worldcup26.com/", "anchor": "World Cup 2026"},
     "tickets": {"url": "https://fifa-worldcup26.com/tickets/", "anchor": "World Cup 2026 tickets"},
     "venues": {"url": "https://fifa-worldcup26.com/venues/", "anchor": "host stadiums and venues"},
-    "travel": {"url": "https://fifa-worldcup26.com/worldcup-travel-flights-hotels-visa/", "anchor": "travel and hotel planning guide"},
+    "venues_usa": {"url": "https://fifa-worldcup26.com/venues/usa/", "anchor": "USA venues"},
+    "venues_canada": {"url": "https://fifa-worldcup26.com/venues/canada/", "anchor": "Canada venues"},
+    "venues_mexico": {"url": "https://fifa-worldcup26.com/venues/mexico/", "anchor": "Mexico venues"},
+    "teams": {"url": "https://fifa-worldcup26.com/teams/", "anchor": "all qualified teams"},
+    "teams_guide": {"url": "https://fifa-worldcup26.com/teams-guide/", "anchor": "teams guide"},
+    "travel": {"url": "https://fifa-worldcup26.com/worldcup-travel-flights-hotels-visa/", "anchor": "travel and visa guide"},
     "broadcasting": {"url": "https://fifa-worldcup26.com/how-to-watch-worldcup/", "anchor": "how to watch World Cup 2026"},
     "qualifiers": {"url": "https://fifa-worldcup26.com/qualifiers/", "anchor": "World Cup 2026 qualifiers"},
-    "matches": {"url": "https://fifa-worldcup26.com/matches/", "anchor": "full match schedule"},
-    "standings": {"url": "https://fifa-worldcup26.com/standings/", "anchor": "current group standings"},
-    "teams": {"url": "https://fifa-worldcup26.com/teams/", "anchor": "all 48 qualified teams"},
+    "matches": {"url": "https://fifa-worldcup26.com/matches/", "anchor": "match schedule"},
+    "standings": {"url": "https://fifa-worldcup26.com/standings/", "anchor": "standings"},
+    "groups": {"url": "https://fifa-worldcup26.com/groups/", "anchor": "groups"},
     "news": {"url": "https://fifa-worldcup26.com/news/", "anchor": "latest World Cup news"},
+    "history": {"url": "https://fifa-worldcup26.com/world-cup-history/", "anchor": "World Cup history"},
+    "records": {"url": "https://fifa-worldcup26.com/records/", "anchor": "records"},
+    "sitemap": {"url": "https://fifa-worldcup26.com/sitemap/", "anchor": "sitemap"},
+    # Blog / editorial (only real published posts)
     "beginner_guide": {"url": "https://fifa-worldcup26.com/world-cup-2026-beginner-guide/", "anchor": "beginner's guide to World Cup 2026"},
-    "messi": {"url": "https://fifa-worldcup26.com/is-messi-playing-world-cup-2026/", "anchor": "Messi's World Cup 2026 plans"},
-    "jerseys": {"url": "https://fifa-worldcup26.com/world-cup-2026-jerseys-kits/", "anchor": "official World Cup 2026 jerseys"},
-    "visa": {"url": "https://fifa-worldcup26.com/us-visa-guide-world-cup-2026/", "anchor": "US visa guide for World Cup fans"},
-    "cheapest_cities": {"url": "https://fifa-worldcup26.com/cheapest-world-cup-2026-host-cities/", "anchor": "cheapest host cities to visit"},
-    "bracket": {"url": "https://fifa-worldcup26.com/fifa-world-cup-2026-bracket/", "anchor": "World Cup 2026 bracket and wall chart"},
-    "opening_match": {"url": "https://fifa-worldcup26.com/world-cup-2026-opening-match/", "anchor": "World Cup 2026 opening match details"},
+    "messi_2026": {"url": "https://fifa-worldcup26.com/is-messi-playing-world-cup-2026/", "anchor": "Messi at World Cup 2026"},
+    "opening_match": {"url": "https://fifa-worldcup26.com/world-cup-2026-opening-match/", "anchor": "opening match"},
+    "bracket": {"url": "https://fifa-worldcup26.com/fifa-world-cup-2026-bracket/", "anchor": "World Cup 2026 bracket"},
+    "who_qualified": {"url": "https://fifa-worldcup26.com/who-has-qualified-world-cup-2026/", "anchor": "who has qualified"},
+    "us_visa": {"url": "https://fifa-worldcup26.com/us-visa-guide-world-cup-2026/", "anchor": "US visa guide for World Cup"},
+    "cheapest_cities": {"url": "https://fifa-worldcup26.com/cheapest-world-cup-2026-host-cities/", "anchor": "cheapest host cities"},
+    "jerseys": {"url": "https://fifa-worldcup26.com/world-cup-2026-jerseys-kits/", "anchor": "World Cup 2026 jerseys"},
+    "tickets_sale": {"url": "https://fifa-worldcup26.com/world-cup-2026-tickets-sale-dates/", "anchor": "ticket sale dates"},
+    "ball_trionda": {"url": "https://fifa-worldcup26.com/world-cup-ball-trionda/", "anchor": "World Cup ball Trionda"},
+    "italy_nigeria_qualify": {"url": "https://fifa-worldcup26.com/did-italy-and-nigeria-qualify-world-cup/", "anchor": "Italy and Nigeria qualification"},
+    "cost_calculator": {"url": "https://fifa-worldcup26.com/world-cup-cost-calculator/", "anchor": "World Cup cost calculator"},
+    "salah_transfer": {"url": "https://fifa-worldcup26.com/salah-liverpool-mls-saudi-transfer-rumors/", "anchor": "Salah transfer rumors"},
+    "ifab_rules": {"url": "https://fifa-worldcup26.com/ifab-new-rules-football-world-cup-time-wasting/", "anchor": "new IFAB rules"},
+    "sandy_grossman": {"url": "https://fifa-worldcup26.com/football-world-cup-2026-sandy-grossman-award/", "anchor": "Sandy Grossman Award"},
+    "quansah_belgium": {"url": "https://fifa-worldcup26.com/john-quansah-injury-pain-pride-belgium/", "anchor": "John Quansah and Belgium"},
+    "kane_vinicius": {"url": "https://fifa-worldcup26.com/kane-vinicius-contract-transfer-news/", "anchor": "Kane and Vinicius transfer news"},
+    "qatar_iran_postponement": {"url": "https://fifa-worldcup26.com/qatar-football-postponement-iran-finalissima/", "anchor": "Qatar postponement and Iran Finalissima"},
+    "messi_miami_comeback": {"url": "https://fifa-worldcup26.com/messis-first-goals-ignite-miami-comeback/", "anchor": "Messi's first goals and Miami comeback"},
 }
 
 
@@ -153,11 +178,13 @@ Use semantic HTML inside the blocks. Avoid heavy inline styles; let the theme ha
 <p style="margin: 0; font-size: 0.95rem;">Stay ahead with the latest news and guides for the tournament.</p>
 </div>
 
-INTERNAL LINKING RULES:
-- Include 2-3 natural internal links.
-- Use anchor text from the list below.
-- Use clean links: <a href="URL">anchor text</a> (theme will style; avoid heavy inline link styles)
-Available pages:
+INTERNAL LINKING RULES (STRICT):
+- You MUST use ONLY the URLs in the list below. Do NOT invent, guess, or hallucinate any internal URL.
+- Include 2-3 internal links, naturally placed where they fit the topic (e.g. link to tickets when discussing attendance, to a team page when that team is central, to a related blog post when relevant).
+- Use the exact URL and suggested anchor text from the list. Format: <a href="EXACT_URL">anchor text</a>
+- If no link from the list fits naturally, use one or two that are closest (e.g. news hub or beginner guide). Never add a link that is not in this list.
+
+Allowed internal links (copy URL and anchor exactly):
 {links_suggestion}
 
 EDITORIAL GUIDELINES:
