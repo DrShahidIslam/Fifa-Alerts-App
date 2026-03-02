@@ -19,6 +19,9 @@ GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 WP_URL = os.getenv("WP_URL", "https://fifa-worldcup26.com")
 WP_USERNAME = os.getenv("WP_USERNAME")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
+# Optional: foolproof publish via webhook on your server (avoids firewall blocking GitHub IPs)
+WP_PUBLISH_WEBHOOK_URL = os.getenv("WP_PUBLISH_WEBHOOK_URL", "").strip()
+WP_PUBLISH_SECRET = os.getenv("WP_PUBLISH_SECRET", "").strip()
 
 # ── RSS Feeds ─────────────────────────────────────────────────────────
 RSS_FEEDS = {

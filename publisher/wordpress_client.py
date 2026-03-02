@@ -3,6 +3,7 @@ WordPress Client — Handles all WordPress REST API interactions:
 creating posts, uploading media, setting categories/tags,
 and injecting RankMath SEO fields.
 """
+import base64
 import logging
 import os
 import re
@@ -20,32 +21,32 @@ logger = logging.getLogger(__name__)
 API_BASE = f"{config.WP_URL}/wp-json/wp/v2"
 AUTH = HTTPBasicAuth(config.WP_USERNAME, config.WP_APP_PASSWORD)
 TIMEOUT = 30
-RETRY_DELAY = 5  # seconds between retries on 502/503
-# User-Agent and Referer avoid Wordfence "Block IPs who send POST with blank User-Agent and Referer"
+RETRY_DELAY = 5   # seconds between retries on 502/503
+RETRY_403_DELAY = 4  # seconds before retry on 403 (some firewalls allow on retry)
+# Browser-like headers reduce "bot" detection by Wordfence/Cloudflare
 HEADERS = {
-    "User-Agent": "FIFANewsAgent/1.0 (WordPress REST)",
+    "User-Agent": "Mozilla/5.0 (compatible; FIFANewsAgent/1.0; +https://github.com/DrShahidIslam/Fifa-Alerts-App)",
     "Referer": f"{config.WP_URL}/",
+    "Accept": "application/json, */*; q=0.1",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Origin": config.WP_URL.rstrip("/"),
 }
 
 
 def create_post(article, featured_image_path=None, status=None):
     """
     Create a WordPress post from an article dict.
-
-    Args:
-        article: dict with keys: title, full_content, slug, tags, category,
-                 meta_description, faq_html
-        featured_image_path: local path to featured image file
-        status: 'draft', 'pending', or 'publish' (overrides config default)
-
-    Returns:
-        dict with keys: post_id, post_url, status
-        or None if failed
+    If WP_PUBLISH_WEBHOOK_URL and WP_PUBLISH_SECRET are set, publishes via webhook (foolproof, no firewall).
+    Otherwise uses REST API (may be blocked by Wordfence/Cloudflare from GitHub Actions).
     """
     if status is None:
         status = config.WP_DEFAULT_STATUS
 
-    logger.info(f"📤 Publishing to WordPress: '{article.get('title', 'Untitled')}'")
+    if getattr(config, "WP_PUBLISH_WEBHOOK_URL", None) and getattr(config, "WP_PUBLISH_SECRET", None):
+        return _publish_via_webhook(article, featured_image_path, status)
+
+    logger.info(f"Publishing to WordPress: '{article.get('title', 'Untitled')}'")
 
     # ── Step 1: Upload featured image (if provided) ───────────────
     media_id = None
@@ -78,7 +79,7 @@ def create_post(article, featured_image_path=None, status=None):
         post_data["featured_media"] = media_id
 
     try:
-        for attempt in range(2):
+        for attempt in range(3):
             response = requests.post(
                 f"{API_BASE}/posts",
                 json=post_data,
@@ -91,8 +92,8 @@ def create_post(article, featured_image_path=None, status=None):
                 post_id = result.get("id")
                 post_url = result.get("link", "")
 
-                logger.info(f"  ✅ Post created (ID: {post_id}, Status: {status})")
-                logger.info(f"  🔗 URL: {post_url}")
+                logger.info(f"  Post created (ID: {post_id}, Status: {status})")
+                logger.info(f"  URL: {post_url}")
 
                 # ── Step 5: Set RankMath SEO fields ─────────────────────
                 _set_rankmath_meta(post_id, article)
@@ -102,21 +103,88 @@ def create_post(article, featured_image_path=None, status=None):
                     "post_url": post_url,
                     "status": status,
                 }
-            if response.status_code in (502, 503) and attempt == 0:
-                logger.warning(f"  ⚠️ WordPress returned {response.status_code}, retrying in {RETRY_DELAY}s...")
+            if response.status_code in (502, 503) and attempt < 2:
+                logger.warning(f"  WordPress {response.status_code}, retrying in {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
+                continue
+            if response.status_code == 403 and attempt < 2:
+                logger.warning(f"  403 Forbidden, retrying in {RETRY_403_DELAY}s (attempt {attempt + 1}/3)...")
+                time.sleep(RETRY_403_DELAY)
                 continue
             break
 
-        logger.error(f"  ❌ Post creation failed: HTTP {response.status_code}")
+        logger.error(f"  Post creation failed: HTTP {response.status_code}")
         logger.error(f"     Response: {response.text[:500]}")
         if response.status_code == 403:
-            logger.error("     Tip: 403 often means firewall/plugin blocking. Whitelist GitHub Actions IPs or allow REST API.")
+            logger.error("     Tip: 403 from GitHub Actions = firewall blocking runner IPs. See deploy/WP_FIREWALL_GUIDE.md Step 1b.")
         return None
 
     except Exception as e:
-        logger.error(f"  ❌ Post creation error: {e}")
+        logger.error(f"  Post creation error: {e}")
         return None
+
+
+def _publish_via_webhook(article, featured_image_path=None, status=None):
+    """
+    Publish via webhook on the user's server. No REST API from agent = no firewall block.
+    Requires deploy/fifa-agent-webhook.php on the server and WP_PUBLISH_WEBHOOK_URL + WP_PUBLISH_SECRET in env.
+    """
+    url = config.WP_PUBLISH_WEBHOOK_URL
+    secret = config.WP_PUBLISH_SECRET
+    if not url or not secret:
+        return None
+
+    payload = {
+        "title": article.get("title", "Untitled"),
+        "content": article.get("full_content", article.get("content", "")),
+        "excerpt": article.get("meta_description", ""),
+        "slug": article.get("slug", ""),
+        "status": status or config.WP_DEFAULT_STATUS,
+        "tags": article.get("tags", []),
+        "category": article.get("category", config.WP_DEFAULT_CATEGORY),
+        "rank_math_title": article.get("title", ""),
+        "rank_math_description": article.get("meta_description", ""),
+        "rank_math_focus_keyword": article.get("matched_keyword", "") or (article.get("tags") or [""])[0],
+    }
+    if featured_image_path and os.path.exists(featured_image_path):
+        with open(featured_image_path, "rb") as f:
+            payload["featured_image_base64"] = base64.b64encode(f.read()).decode("ascii")
+        payload["featured_image_filename"] = os.path.basename(featured_image_path)
+
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                url,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-FIFA-Agent-Token": secret,
+                    "User-Agent": "FIFANewsAgent/1.0",
+                },
+                timeout=60,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("success"):
+                    logger.info(f"  Post created via webhook (ID: {data.get('post_id')}, URL: {data.get('post_url', '')})")
+                    return {
+                        "post_id": data.get("post_id"),
+                        "post_url": data.get("post_url", ""),
+                        "status": data.get("status", status),
+                    }
+                logger.error(f"  Webhook returned success=false: {data.get('message', '')}")
+                return None
+            if r.status_code in (502, 503, 403) and attempt < 2:
+                logger.warning(f"  Webhook {r.status_code}, retrying in {RETRY_DELAY}s...")
+                time.sleep(RETRY_DELAY)
+                continue
+            logger.error(f"  Webhook failed: HTTP {r.status_code} - {r.text[:300]}")
+            return None
+        except Exception as e:
+            logger.warning(f"  Webhook request error (attempt {attempt + 1}/3): {e}")
+            if attempt < 2:
+                time.sleep(RETRY_DELAY)
+    return None
 
 
 def upload_media(file_path, title=""):
@@ -138,7 +206,7 @@ def upload_media(file_path, title=""):
             "Content-Type": mime_type,
         })
 
-        for attempt in range(2):
+        for attempt in range(3):
             response = requests.post(
                 f"{API_BASE}/media",
                 data=file_data,
@@ -148,7 +216,7 @@ def upload_media(file_path, title=""):
             )
             if response.status_code in (200, 201):
                 media_id = response.json().get("id")
-                logger.info(f"  ✅ Image uploaded (Media ID: {media_id})")
+                logger.info(f"  Image uploaded (Media ID: {media_id})")
 
                 if title:
                     requests.post(
@@ -159,14 +227,20 @@ def upload_media(file_path, title=""):
                         timeout=15,
                     )
                 return media_id
-            if response.status_code in (502, 503) and attempt == 0:
-                logger.warning(f"  ⚠️ Media upload {response.status_code}, retrying in {RETRY_DELAY}s...")
+            if response.status_code in (502, 503) and attempt < 2:
+                logger.warning(f"  Media upload {response.status_code}, retrying in {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
+                continue
+            if response.status_code == 403 and attempt < 2:
+                logger.warning(f"  403 on media upload, retrying in {RETRY_403_DELAY}s (attempt {attempt + 1}/3)...")
+                time.sleep(RETRY_403_DELAY)
                 continue
             break
 
-        logger.error(f"  ❌ Media upload failed: HTTP {response.status_code}")
+        logger.error(f"  Media upload failed: HTTP {response.status_code}")
         logger.error(f"     {response.text[:300]}")
+        if response.status_code == 403:
+            logger.error("     Tip: See deploy/WP_FIREWALL_GUIDE.md Step 1b (allowlist GitHub Actions IPs).")
         return None
 
     except Exception as e:
