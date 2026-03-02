@@ -362,22 +362,50 @@ def _set_rankmath_meta(post_id, article):
         logger.warning(f"  RankMath meta update failed: {e}")
 
 def update_post_status(post_id, status="publish"):
-    """Update a post's status (e.g., from draft to publish)."""
+    """Update a post's status (e.g., from draft to publish). Uses webhook if configured, else REST API."""
+    if getattr(config, "WP_PUBLISH_WEBHOOK_URL", None) and getattr(config, "WP_PUBLISH_SECRET", None):
+        return _update_status_via_webhook(post_id, status)
     try:
         response = requests.post(
             f"{API_BASE}/posts/{post_id}",
             json={"status": status},
             auth=AUTH,
             headers=HEADERS,
-            timeout=TIMEOUT
+            timeout=TIMEOUT,
         )
         if response.status_code == 200:
-            return response.json().get("link")
-        else:
-            logger.error(f"Failed to update post status: HTTP {response.status_code}")
-            return None
+            try:
+                return response.json().get("link")
+            except (ValueError, KeyError):
+                logger.error("Update post status: response was not valid JSON (REST may be blocked)")
+                return None
+        logger.error(f"Failed to update post status: HTTP {response.status_code}")
+        return None
     except Exception as e:
         logger.error(f"Error updating post status: {e}")
+        return None
+
+
+def _update_status_via_webhook(post_id, status="publish"):
+    """Update post status via webhook (same endpoint as create; avoids REST 403 from GitHub Actions)."""
+    url = config.WP_PUBLISH_WEBHOOK_URL
+    secret = config.WP_PUBLISH_SECRET
+    if not url or not secret:
+        return None
+    try:
+        r = requests.post(
+            url,
+            json={"action": "publish_draft", "post_id": int(post_id), "status": status},
+            headers={"Content-Type": "application/json", "X-FIFA-Agent-Token": secret},
+            timeout=30,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("success"):
+                return data.get("post_url")
+        return None
+    except Exception as e:
+        logger.warning(f"Webhook status update failed: {e}")
         return None
 
 

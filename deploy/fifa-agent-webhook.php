@@ -53,6 +53,22 @@ if ($expected === '' || $secret !== $expected) {
     exit;
 }
 
+// Action: publish draft (change post status without going through REST API)
+if (!empty($data['action']) && $data['action'] === 'publish_draft' && isset($data['post_id'])) {
+    $post_id = (int) $data['post_id'];
+    $new_status = isset($data['status']) && in_array($data['status'], ['draft', 'pending', 'publish'], true) ? $data['status'] : 'publish';
+    if ($post_id > 0) {
+        $updated = wp_update_post(['ID' => $post_id, 'post_status' => $new_status], true);
+        if (!is_wp_error($updated)) {
+            echo json_encode(['success' => true, 'post_id' => $post_id, 'post_url' => get_permalink($post_id), 'status' => $new_status]);
+            exit;
+        }
+    }
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Invalid post_id or update failed']);
+    exit;
+}
+
 $title       = isset($data['title']) ? sanitize_text_field($data['title']) : 'Untitled';
 $content     = isset($data['content']) ? $data['content'] : '';
 $excerpt     = isset($data['excerpt']) ? sanitize_textarea_field($data['excerpt']) : '';
