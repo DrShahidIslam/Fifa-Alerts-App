@@ -207,11 +207,11 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[Your full article body in GUTENBERG BLOCK MARKUP. Start with <!-- wp:paragraph --> and <p>...</p> and <!-- /wp:paragraph -->. Wrap every paragraph, heading, blockquote, list, and custom div in the correct wp: block comments as specified above. Include Key Facts box (in <!-- wp:html -->), pull quotes (<!-- wp:quote -->), highlight boxes (<!-- wp:html -->), and closing CTA (<!-- wp:html -->).]
+[ONLY the main article body: intro, Key Facts box, body sections, closing CTA. Use GUTENBERG BLOCK MARKUP. Do NOT put "Frequently Asked Questions", FAQ Q&A, or any JSON-LD schema here. Those go ONLY in FAQ_START below. Order: wp:group with padding, then paragraphs, Key Facts (wp:html), headings, quotes, highlight boxes, closing CTA (wp:html), then close the group.]
 ---CONTENT_END---
 
 ---FAQ_START---
-[Your styled FAQ content in Gutenberg blocks. Use <!-- wp:heading --> for "Frequently Asked Questions", then <!-- wp:html --> for each FAQ div. Then put the JSON-LD schema in a SEPARATE Custom HTML block so it is NOT visible as text — only for search engines:]
+[ONLY the FAQ Q&A blocks and the JSON-LD schema. Do NOT repeat the article body. Put each FAQ answer in <!-- wp:html -->. Then put the schema inside a single <!-- wp:html --> block with <script type="application/ld+json">...</script> so it is hidden from readers:]
 
 <!-- wp:html -->
 <script type="application/ld+json">

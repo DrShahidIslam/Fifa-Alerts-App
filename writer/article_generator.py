@@ -157,27 +157,52 @@ def generate_article(topic, source_urls=None):
 
 
 def _ensure_schema_in_html_block(faq_html):
-    """Wrap any JSON-LD script in faq_html inside <!-- wp:html --> so it doesn't display as text."""
-    if not faq_html or "<script" not in faq_html:
+    """Strip JSON-LD from visible FAQ and put it in a single wp:html block so it never displays as text."""
+    if not faq_html:
         return faq_html
-    # If already inside wp:html block, leave as is
-    if "<!-- wp:html -->" in faq_html and "application/ld+json" in faq_html:
-        return faq_html
-    # Find <script type="application/ld+json">...</script>
+    schema_block = None
+    # 1) Already in script tag: extract and wrap in wp:html
     script_match = re.search(
-        r'(<script\s+type=["\']application/ld\+json["\']\s*>)(.*?)(</script>)',
+        r'<script\s+type=["\']application/ld\+json["\']\s*>(.*?)</script>',
         faq_html, re.DOTALL | re.IGNORECASE
     )
-    if not script_match:
-        return faq_html
-    prefix, json_content, suffix = script_match.group(1), script_match.group(2), script_match.group(3)
-    script_full = prefix + json_content + suffix
-    # Remove the raw script from faq_html and append it wrapped in wp:html
-    faq_without_script = faq_html.replace(script_full, "").strip()
-    # Remove resulting double newlines or empty blocks
-    faq_without_script = re.sub(r'\n{3,}', '\n\n', faq_without_script)
-    wrapped = '<!-- wp:html -->\n' + script_full + '\n<!-- /wp:html -->'
-    return (faq_without_script + "\n\n" + wrapped).strip() if faq_without_script else wrapped
+    if script_match:
+        json_content = script_match.group(1).strip()
+        schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_content + '\n</script>\n<!-- /wp:html -->'
+        faq_html = re.sub(r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>', '', faq_html, flags=re.DOTALL | re.IGNORECASE)
+    # 2) Raw JSON-LD (no script tag) — model sometimes outputs this; strip and wrap so it never shows as text
+    raw_json_match = re.search(
+        r'(\{\s*["\']@context["\']\s*:\s*["\']https?://schema\.org["\'][\s\S]*?\]\s*\})',
+        faq_html
+    )
+    if raw_json_match:
+        json_str = raw_json_match.group(1).strip()
+        schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_str + '\n</script>\n<!-- /wp:html -->'
+        faq_html = faq_html.replace(raw_json_match.group(0), "").strip()
+    faq_html = re.sub(r'\n{3,}', '\n\n', faq_html).strip()
+    if schema_block:
+        faq_html = (faq_html + "\n\n" + schema_block).strip()
+    return faq_html
+
+
+def _strip_faq_and_schema_from_content(content):
+    """Remove FAQ section and JSON-LD schema if the model wrongly put them inside CONTENT (keeps order correct, no duplicates)."""
+    if not content:
+        return content
+    # Remove raw JSON-LD (visible schema text) — match through end of FAQPage object
+    content = re.sub(
+        r'\{\s*["\']@context["\']\s*:\s*["\']https?://schema\.org["\'][\s\S]*?\]\s*\}\s*',
+        '',
+        content
+    )
+    # Remove script-based schema from content (should only be in FAQ)
+    content = re.sub(
+        r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>\s*',
+        '',
+        content, flags=re.DOTALL | re.IGNORECASE
+    )
+    content = re.sub(r'\n{3,}', '\n\n', content).strip()
+    return content
 
 
 def _wrap_content_with_padding(content):
@@ -231,15 +256,19 @@ def _parse_article_output(raw_text):
         faq_match = re.search(r'---FAQ_START---(.*?)---FAQ_END---', raw_text, re.DOTALL)
         result["faq_html"] = faq_match.group(1).strip() if faq_match else ""
 
-        # Ensure JSON-LD schema is inside a Custom HTML block so it doesn't display as text
+        # Ensure JSON-LD schema is in wp:html only and never visible as text (strip raw JSON if present)
         result["faq_html"] = _ensure_schema_in_html_block(result["faq_html"])
 
-        # Combine content + FAQ (optionally wrap content in Group block for padding if missing)
-        content = result["content"]
+        # Remove any FAQ heading or schema the model wrongly put inside CONTENT (avoid duplicates)
+        content = _strip_faq_and_schema_from_content(result["content"])
         if "wp:group" not in content.strip()[:250]:
             content = _wrap_content_with_padding(content)
         if result["faq_html"]:
-            result["full_content"] = content + "\n\n<!-- wp:heading -->\n<h2>Frequently Asked Questions</h2>\n<!-- /wp:heading -->\n\n" + result["faq_html"]
+            faq_part = result["faq_html"].strip()
+            # Add heading only if model didn't already include it
+            if "Frequently Asked Questions" not in faq_part[:300]:
+                faq_part = "<!-- wp:heading -->\n<h2>Frequently Asked Questions</h2>\n<!-- /wp:heading -->\n\n" + faq_part
+            result["full_content"] = content + "\n\n" + faq_part
         else:
             result["full_content"] = content
         result["content"] = content

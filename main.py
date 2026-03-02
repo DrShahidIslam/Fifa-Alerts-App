@@ -492,12 +492,12 @@ def _handle_approve(status="draft"):
             save_pending_state()
         else:
             send_simple_message(
-                "❌ WordPress publishing failed. Check WP credentials and that your host allows the REST API "
-                "(some firewalls or security plugins block requests from GitHub Actions)."
+                "Publishing failed. If you use the webhook: check that fifa-agent-webhook.php is updated and "
+                "FIFA_AGENT_WEBHOOK_AUTHOR is set in wp-config. Otherwise check firewall or REST API access."
             )
     except Exception as e:
         logger.error(f"WordPress publish error: {e}")
-        send_simple_message(f"❌ Publishing error: {str(e)[:200]}")
+        send_simple_message(f"Publishing error: {str(e)[:180]}")
 
 def _handle_show_pending():
     """Resend the pending article preview (and image if available) so the user can see it."""
