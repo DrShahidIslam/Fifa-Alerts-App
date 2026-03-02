@@ -47,4 +47,6 @@ jobs:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          WP_PUBLISH_WEBHOOK_URL: ${{ secrets.WP_PUBLISH_WEBHOOK_URL }}
+          WP_PUBLISH_SECRET: ${{ secrets.WP_PUBLISH_SECRET }}
         run: python main.py --once
