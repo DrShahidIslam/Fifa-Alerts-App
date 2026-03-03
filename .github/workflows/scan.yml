@@ -39,6 +39,7 @@ jobs:
             fifa-agent-
 
       - name: Run news scan and handle commands
+        id: run-agent
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -50,3 +51,13 @@ jobs:
           WP_PUBLISH_WEBHOOK_URL: ${{ secrets.WP_PUBLISH_WEBHOOK_URL }}
           WP_PUBLISH_SECRET: ${{ secrets.WP_PUBLISH_SECRET }}
         run: python main.py --once
+
+      - name: Save agent state to cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            agent.db
+            pending_state.json
+            latest_topics.json
+          key: fifa-agent-${{ hashFiles('config.py') }}-v2

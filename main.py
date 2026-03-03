@@ -45,11 +45,16 @@ _update_offset = None     # Telegram getUpdates offset
 _gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
 _article_attempted_this_run = False  # Limit to one article generation per --once run
 
+# Pending state is considered stale after this many hours (stuck draft from cache is auto-cleared)
+PENDING_STALE_HOURS = 6
+
 def save_pending_state():
     """Save pending article and image path to disk for cross-run persistence."""
+    from datetime import timezone
     state = {
         "article": _pending_article,
-        "image_path": _pending_image_path
+        "image_path": _pending_image_path,
+        "saved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
     try:
         with open("pending_state.json", "w", encoding="utf-8") as f:
@@ -58,7 +63,7 @@ def save_pending_state():
         logger.error(f"Failed to save pending state: {e}")
 
 def load_pending_state():
-    """Load pending article and image path from disk."""
+    """Load pending article and image path from disk. Clears if stale (stuck from old cache)."""
     global _pending_article, _pending_image_path
     if _pending_article:
         return True
@@ -66,12 +71,38 @@ def load_pending_state():
         if os.path.exists("pending_state.json"):
             with open("pending_state.json", "r", encoding="utf-8") as f:
                 state = json.load(f)
-                _pending_article = state.get("article")
-                _pending_image_path = state.get("image_path")
-                # Image file may not persist across runs (e.g. GitHub Actions); clear if missing
-                if _pending_image_path and not os.path.exists(_pending_image_path):
+            # If pending is older than PENDING_STALE_HOURS (or has no timestamp), treat as abandoned
+            saved_at = state.get("saved_at")
+            if state.get("article"):
+                clear = False
+                if not saved_at:
+                    # Legacy state with no timestamp: clear so stuck cache doesn't block forever
+                    logger.info("Clearing pending state (no timestamp; likely stuck from cache)")
+                    clear = True
+                elif saved_at:
+                    try:
+                        from datetime import timezone
+                        parsed = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
+                        if parsed.tzinfo is None:
+                            parsed = parsed.replace(tzinfo=timezone.utc)
+                        now = datetime.now(timezone.utc)
+                        age_hours = (now - parsed).total_seconds() / 3600
+                        if age_hours > PENDING_STALE_HOURS:
+                            logger.info(f"Clearing stale pending state (saved {age_hours:.0f}h ago)")
+                            clear = True
+                    except Exception:
+                        pass
+                if clear:
+                    _pending_article = None
                     _pending_image_path = None
-                return bool(_pending_article)
+                    save_pending_state()
+                    return False
+            _pending_article = state.get("article")
+            _pending_image_path = state.get("image_path")
+            # Image file may not persist across runs (e.g. GitHub Actions); clear if missing
+            if _pending_image_path and not os.path.exists(_pending_image_path):
+                _pending_image_path = None
+            return bool(_pending_article)
     except Exception as e:
         logger.error(f"Failed to load pending state: {e}")
     return False
@@ -336,9 +367,16 @@ def _handle_write_article(topic_hash=None):
         return
 
     topic = None
-    
-    # Check if we already have an article waiting for review
-    if _pending_article or load_pending_state():
+
+    # If user tapped "Generate Article" on a specific alert, allow replacing the current pending draft
+    if topic_hash and (_pending_article or load_pending_state()):
+        prev_title = (_pending_article or {}).get("title", "Previous draft")
+        _pending_article = None
+        _pending_image_path = None
+        save_pending_state()
+        send_simple_message(f"Replacing previous draft ('{prev_title[:40]}...'). Generating for the selected topic.")
+    # If no specific topic (e.g. /write_article) and something is pending, remind to approve/reject first
+    elif (not topic_hash) and (_pending_article or load_pending_state()):
         send_pending_reminder((_pending_article or {}).get("title", "Unknown"))
         return
 
