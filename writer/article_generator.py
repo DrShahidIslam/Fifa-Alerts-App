@@ -294,28 +294,11 @@ def _parse_article_output(raw_text):
 
         # Extract CONTENT
         content_match = re.search(r'---CONTENT_START---(.*?)---CONTENT_END---', raw_text, re.DOTALL)
-        result["content"] = content_match.group(1).strip() if content_match else ""
-
-        # Extract FAQ
-        faq_match = re.search(r'---FAQ_START---(.*?)---FAQ_END---', raw_text, re.DOTALL)
-        result["faq_html"] = faq_match.group(1).strip() if faq_match else ""
-
-        # Ensure JSON-LD schema is in wp:html only and never visible as text (strip raw JSON if present)
-        result["faq_html"] = _ensure_schema_in_html_block(result["faq_html"])
-
-        # Remove any FAQ heading or schema the model wrongly put inside CONTENT (avoid duplicates)
-        content = _strip_faq_and_schema_from_content(result["content"])
-        if "wp:group" not in content.strip()[:250]:
-            content = _wrap_content_with_padding(content)
-        if result["faq_html"]:
-            faq_part = result["faq_html"].strip()
-            # Add heading only if model didn't already include it
-            if "Frequently Asked Questions" not in faq_part[:300]:
-                faq_part = "<!-- wp:heading -->\n<h2>Frequently Asked Questions</h2>\n<!-- /wp:heading -->\n\n" + faq_part
-            result["full_content"] = content + "\n\n" + faq_part
-        else:
-            result["full_content"] = content
+        content = content_match.group(1).strip() if content_match else ""
+        
         result["content"] = content
+        result["full_content"] = content
+        result["faq_html"] = ""
 
         # Validate we got essential fields
         if not result["title"] or not result["content"]:

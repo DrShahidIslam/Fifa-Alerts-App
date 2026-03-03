@@ -109,82 +109,100 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 4. ARTICLE BODY: Magazine-quality HTML (design details below).
 5. FAQ: 3-4 schema-ready questions.
 
-─── OUTPUT FORMAT: GUTENBERG BLOCKS (REQUIRED) ───
+**1. NO WORDPRESS BLOCK COMMENTS**: Do NOT output any `<!-- wp:... -->` comments. Produce strictly raw HTML.
 
-**1. WRAP THE ENTIRE ARTICLE BODY in a Group block with padding** (top 1.5rem, sides 2rem, bottom 2.5rem). Start the ARTICLE BODY with:
-<!-- wp:group {{"style":{{"spacing":{{"padding":{{"top":"1.5rem","right":"2rem","bottom":"2.5rem","left":"2rem"}}}}}}}} -->
+**2. FOLLOW THIS EXACT HTML TEMPLATE** (Copy the structure and inline styles exactly as shown here):
+
 <div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem">
-Then place all your blocks inside, and close with:
-</div>
-<!-- /wp:group -->
 
-**2. Wrap every element** in block comments as follows:
-- **Paragraphs:** <!-- wp:paragraph -->
-<p>Your text.</p>
-<!-- /wp:paragraph -->
-- **Headings:** <!-- wp:heading -->
-<h2>Section Title</h2>
-<!-- /wp:heading --> (or h3)
-- **Blockquotes:** <!-- wp:quote -->
-<blockquote><p>Quote text.</p></blockquote>
-<!-- /wp:quote -->
-- **Lists:** <!-- wp:list -->
-<ul><li>Item</li></ul>
-<!-- /wp:list -->
-- **Custom HTML (Key Facts box, FAQ, CTA divs):** <!-- wp:html -->
-<div>...</div>
-<!-- /wp:html -->
+<h2 class="wp-block-heading">[Your Main Heading]</h2>
+<p>[Your introductory text goes here...]</p>
+<p>[More text...]</p>
 
-Do NOT output raw HTML without block wrappers. Every paragraph, heading, blockquote, and standalone div must have its opening <!-- wp:... --> and closing <!-- /wp:... -->. This ensures the post uses blocks in the editor and works with Kadence Blocks.
-
-─── HTML DESIGN (Kadence Pro + RankMath compatible) ───
-
-Use semantic HTML inside the blocks. Avoid heavy inline styles; let the theme handle appearance. Keep structure clear for RankMath and schema.
-
-**KEY FACTS BOX** — Directly after the intro paragraph. Use a simple div with class for Kadence compatibility:
-<div style="border-left: 4px solid #e94560; padding: 1rem 1.25rem; margin: 1.5rem 0; background: rgba(0,0,0,0.05); border-radius: 0 8px 8px 0;">
-<h3 style="margin: 0 0 0.75rem 0; font-size: 1.1rem;">Key Facts</h3>
-<ul style="margin: 0; padding-left: 1.25rem; line-height: 1.6;">
-<li>[Factual insight 1]</li>
-<li>[Factual insight 2]</li>
-<li>[Factual insight 3]</li>
+<div style="border-left: 4px solid #e94560;padding: 1rem 1.25rem;margin: 1.5rem 0;border-radius: 0 8px 8px 0;background-color:#f9f9f9;color:#000000;">
+<h3 style="margin: 0 0 0.75rem 0;font-size: 1.1rem;color:#000000;">Key Facts</h3>
+<ul style="margin: 0;padding-left: 1.25rem;line-height: 1.6;color:#000000;">
+<li>[Fact 1]</li>
+<li>[Fact 2]</li>
+<li>[Fact 3]</li>
 </ul>
 </div>
 
-**HEADINGS** — Use proper H2/H3 hierarchy for SEO. Kadence will style them:
-<h2>Section Title</h2>
+<h2>[Next Section Heading]</h2>
+<p>[Section text... example internal link: <a href="https://fifa-worldcup26.com/news/">latest World Cup news</a>...]</p>
 
-**PULL QUOTES** — Use blockquote. Kadence wp-block-quote styling will apply:
-<blockquote>
-"Direct quote or critical statistical insight."
-</blockquote>
-
-**HIGHLIGHT BOX** — For breaking or critical info:
-<div style="padding: 1rem 1.25rem; margin: 1.5rem 0; border: 1px solid #ffc107; border-radius: 8px; background: rgba(255,193,7,0.08);">
-<strong>Important Update:</strong> High-value summary text.
+<div style="padding: 1rem 1.25rem;margin: 1.5rem 0;border: 1px solid #ffc107;border-radius: 8px;background-color:#fffdf5;color:#000000;">
+<strong>Important Update:</strong> [A crucial highlight or takeaway from the article.]
 </div>
 
-**FAQ SECTION** — Semantic structure for RankMath FAQ schema. Use details/summary or simple divs:
-<div style="margin: 1.5rem 0; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
-<div style="padding: 1rem 1.25rem; border-bottom: 1px solid rgba(0,0,0,0.1);">
-<h3 style="margin: 0 0 0.5rem 0;">Question?</h3>
-<p style="margin: 0;">The direct, concise answer first, followed by detail.</p>
+<h2>[Another Section Heading]</h2>
+<p>[Content...]</p>
+
+<div style="text-align: center;padding: 1.5rem;margin: 1.5rem 0;border-radius: 8px;background-color:#f0f4f8;color:#000000;">
+<p style="margin: 0 0 0.5rem 0;font-weight: 600;color:#000000;">Explore More on World Cup 2026</p>
+<p style="margin: 0;font-size: 0.95rem;color:#000000;">Stay ahead with the latest news and guides for the tournament.</p>
+</div>
+
+<h2>Frequently Asked Questions</h2>
+<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
+<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
+<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 1?]</h3>
+<p style="margin: 0;color:#000000;">[Answer to Question 1.]</p>
+</div>
+</div>
+<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
+<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
+<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 2?]</h3>
+<p style="margin: 0;color:#000000;">[Answer to Question 2.]</p>
+</div>
+</div>
+<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
+<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
+<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 3?]</h3>
+<p style="margin: 0;color:#000000;">[Answer to Question 3.]</p>
 </div>
 </div>
 
-**CLOSING CTA** — Simple call-to-action. Keep minimal inline styles:
-<div style="text-align: center; padding: 1.5rem; margin: 1.5rem 0; border-radius: 8px; background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08);">
-<p style="margin: 0 0 0.5rem 0; font-weight: 600;">Explore More on World Cup 2026</p>
-<p style="margin: 0; font-size: 0.95rem;">Stay ahead with the latest news and guides for the tournament.</p>
+<script type="application/ld+json">
+{{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {{
+      "@type": "Question",
+      "name": "[Question 1?]",
+      "acceptedAnswer": {{
+        "@type": "Answer",
+        "text": "[Answer to Question 1.]"
+      }}
+    }},
+    {{
+      "@type": "Question",
+      "name": "[Question 2?]",
+      "acceptedAnswer": {{
+        "@type": "Answer",
+        "text": "[Answer to Question 2.]"
+      }}
+    }},
+    {{
+      "@type": "Question",
+      "name": "[Question 3?]",
+      "acceptedAnswer": {{
+        "@type": "Answer",
+        "text": "[Answer to Question 3.]"
+      }}
+    }}
+  ]
+}}
+</script>
 </div>
 
 INTERNAL LINKING RULES (STRICT):
-- You MUST use ONLY the URLs in the list below. Do NOT invent, guess, or hallucinate any internal URL.
-- Include 2-3 internal links, naturally placed where they fit the topic (e.g. link to tickets when discussing attendance, to a team page when that team is central, to a related blog post when relevant).
+- The internal links MUST BE GENUINE. I mean ONLY use our original links from the list below. Do NOT invent, guess, or hallucinate any internal URL.
+- Include 2-3 genuine internal links, naturally placed where they fit the topic.
 - Use the exact URL and suggested anchor text from the list. Format: <a href="EXACT_URL">anchor text</a>
-- If no link from the list fits naturally, use one or two that are closest (e.g. news hub or beginner guide). Never add a link that is not in this list.
 
-Allowed internal links (copy URL and anchor exactly):
+Allowed genuine internal links (copy URL and anchor exactly):
 {links_suggestion}
 
 EDITORIAL GUIDELINES:
@@ -207,31 +225,8 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[ONLY the main article body: intro, Key Facts box, body sections, closing CTA. Use GUTENBERG BLOCK MARKUP. Do NOT put "Frequently Asked Questions", FAQ Q&A, or any JSON-LD schema here. Those go ONLY in FAQ_START below. Order: wp:group with padding, then paragraphs, Key Facts (wp:html), headings, quotes, highlight boxes, closing CTA (wp:html), then close the group.]
+[Generate the entire HTML structure exactly as specified in the HTML template above, placing everything inside the main wp-block-group div, including the FAQ section and the JSON-LD schema at the end. Output the RAW HTML directly without using ```html markdown tags!]
 ---CONTENT_END---
-
----FAQ_START---
-[ONLY the FAQ Q&A blocks and the JSON-LD schema. Do NOT repeat the article body. Put each FAQ answer in <!-- wp:html -->. Then put the schema inside a single <!-- wp:html --> block with <script type="application/ld+json">...</script> so it is hidden from readers:]
-
-<!-- wp:html -->
-<script type="application/ld+json">
-{{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {{
-      "@type": "Question",
-      "name": "Insert Question 1",
-      "acceptedAnswer": {{
-        "@type": "Answer",
-        "text": "Insert detailed answer 1."
-      }}
-    }}
-  ]
-}}
-</script>
-<!-- /wp:html -->
----FAQ_END---
 """
 
     return prompt
