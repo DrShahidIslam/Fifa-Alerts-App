@@ -163,15 +163,19 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
         payload["featured_image_filename"] = os.path.basename(featured_image_path)
 
     for attempt in range(3):
+        headers = HEADERS.copy()
+        headers.update({
+            "Content-Type": "application/json",
+            "X-FIFA-Agent-Token": secret,
+        })
+        if "Accept-Encoding" in headers:
+            del headers["Accept-Encoding"]
+
         try:
             r = requests.post(
                 url,
                 json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-FIFA-Agent-Token": secret,
-                    "User-Agent": "FIFANewsAgent/1.0",
-                },
+                headers=headers,
                 timeout=60,
             )
             if r.status_code == 200:
@@ -411,11 +415,20 @@ def _update_status_via_webhook(post_id, status="publish"):
     secret = config.WP_PUBLISH_SECRET
     if not url or not secret:
         return None
+        
     try:
+        headers = HEADERS.copy()
+        headers.update({
+            "Content-Type": "application/json",
+            "X-FIFA-Agent-Token": secret,
+        })
+        if "Accept-Encoding" in headers:
+            del headers["Accept-Encoding"]
+
         r = requests.post(
             url,
             json={"action": "publish_draft", "post_id": int(post_id), "status": status},
-            headers={"Content-Type": "application/json", "X-FIFA-Agent-Token": secret},
+            headers=headers,
             timeout=30,
         )
         if r.status_code == 200:
