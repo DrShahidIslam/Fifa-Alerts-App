@@ -156,6 +156,47 @@ def generate_article(topic, source_urls=None):
     return article
 
 
+def _extract_faqpage_json(text):
+    """Extract raw FAQPage JSON-LD from text (brace matching so we get the full object). Returns None if not found."""
+    for start_marker in ('{"@context"', '{ "@context"', "{'@context'"):
+        start = text.find(start_marker)
+        if start == -1:
+            continue
+        depth = 0
+        in_string = False
+        escape = False
+        quote = None
+        i = start
+        while i < len(text):
+            c = text[i]
+            if escape:
+                escape = False
+                i += 1
+                continue
+            if c == '\\' and in_string:
+                escape = True
+                i += 1
+                continue
+            if in_string:
+                if c == quote:
+                    in_string = False
+                i += 1
+                continue
+            if c in ('"', "'"):
+                in_string = True
+                quote = c
+                i += 1
+                continue
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return text[start:i + 1].strip()
+            i += 1
+    return None
+
+
 def _ensure_schema_in_html_block(faq_html):
     """Strip JSON-LD from visible FAQ and put it in a single wp:html block so it never displays as text."""
     if not faq_html:
@@ -170,15 +211,17 @@ def _ensure_schema_in_html_block(faq_html):
         json_content = script_match.group(1).strip()
         schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_content + '\n</script>\n<!-- /wp:html -->'
         faq_html = re.sub(r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>', '', faq_html, flags=re.DOTALL | re.IGNORECASE)
-    # 2) Raw JSON-LD (no script tag) — model sometimes outputs this; strip and wrap so it never shows as text
-    raw_json_match = re.search(
-        r'(\{\s*["\']@context["\']\s*:\s*["\']https?://schema\.org["\'][\s\S]*?\]\s*\})',
-        faq_html
-    )
-    if raw_json_match:
-        json_str = raw_json_match.group(1).strip()
+    # 2) Raw JSON-LD (no script tag) — model often outputs this; strip and wrap so it never shows as text
+    json_str = _extract_faqpage_json(faq_html)
+    if json_str:
         schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_str + '\n</script>\n<!-- /wp:html -->'
-        faq_html = faq_html.replace(raw_json_match.group(0), "").strip()
+        # Remove the raw JSON from faq_html (match by start and length since content may repeat)
+        idx = faq_html.find(json_str[:50])
+        if idx != -1:
+            end = idx + len(json_str)
+            faq_html = (faq_html[:idx] + faq_html[end:]).strip()
+        else:
+            faq_html = faq_html.replace(json_str, "", 1).strip()
     faq_html = re.sub(r'\n{3,}', '\n\n', faq_html).strip()
     if schema_block:
         faq_html = (faq_html + "\n\n" + schema_block).strip()
@@ -189,12 +232,12 @@ def _strip_faq_and_schema_from_content(content):
     """Remove FAQ section and JSON-LD schema if the model wrongly put them inside CONTENT (keeps order correct, no duplicates)."""
     if not content:
         return content
-    # Remove raw JSON-LD (visible schema text) — match through end of FAQPage object
-    content = re.sub(
-        r'\{\s*["\']@context["\']\s*:\s*["\']https?://schema\.org["\'][\s\S]*?\]\s*\}\s*',
-        '',
-        content
-    )
+    # Remove raw JSON-LD (visible schema text) using brace matching
+    while True:
+        json_str = _extract_faqpage_json(content)
+        if not json_str:
+            break
+        content = content.replace(json_str, "", 1).strip()
     # Remove script-based schema from content (should only be in FAQ)
     content = re.sub(
         r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>\s*',
@@ -206,12 +249,13 @@ def _strip_faq_and_schema_from_content(content):
 
 
 def _wrap_content_with_padding(content):
-    """Wrap article content in a Group block with medium padding (1.5rem) for Kadence."""
+    """Wrap article content in a Group block with padding for Kadence (more on sides and bottom)."""
     if not content or "wp:group" in content.strip()[:250]:
         return content
+    # top 1.5rem, right/left 2rem, bottom 2.5rem
     return (
-        '<!-- wp:group {"style":{"spacing":{"padding":{"top":"1.5rem","right":"1.5rem","bottom":"1.5rem","left":"1.5rem"}}}} -->\n'
-        '<div class="wp-block-group" style="padding:1.5rem">\n\n'
+        '<!-- wp:group {"style":{"spacing":{"padding":{"top":"1.5rem","right":"2rem","bottom":"2.5rem","left":"2rem"}}}} -->\n'
+        '<div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem">\n\n'
         + content.strip() + "\n\n"
         + '</div>\n<!-- /wp:group -->'
     )

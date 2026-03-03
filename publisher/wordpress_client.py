@@ -18,6 +18,9 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# Set when publish fails so Telegram can show the reason
+LAST_PUBLISH_ERROR = None
+
 API_BASE = f"{config.WP_URL}/wp-json/wp/v2"
 AUTH = HTTPBasicAuth(config.WP_USERNAME, config.WP_APP_PASSWORD)
 TIMEOUT = 30
@@ -43,8 +46,13 @@ def create_post(article, featured_image_path=None, status=None):
     if status is None:
         status = config.WP_DEFAULT_STATUS
 
+    global LAST_PUBLISH_ERROR
+    LAST_PUBLISH_ERROR = None
     if getattr(config, "WP_PUBLISH_WEBHOOK_URL", None) and getattr(config, "WP_PUBLISH_SECRET", None):
-        return _publish_via_webhook(article, featured_image_path, status)
+        out = _publish_via_webhook(article, featured_image_path, status)
+        if out is None and LAST_PUBLISH_ERROR:
+            logger.error(f"  Webhook: {LAST_PUBLISH_ERROR}")
+        return out
 
     logger.info(f"Publishing to WordPress: '{article.get('title', 'Untitled')}'")
 
@@ -115,12 +123,14 @@ def create_post(article, featured_image_path=None, status=None):
 
         logger.error(f"  Post creation failed: HTTP {response.status_code}")
         logger.error(f"     Response: {response.text[:500]}")
+        LAST_PUBLISH_ERROR = f"REST HTTP {response.status_code}"
         if response.status_code == 403:
             logger.error("     Tip: 403 from GitHub Actions = firewall blocking runner IPs. See deploy/WP_FIREWALL_GUIDE.md Step 1b.")
         return None
 
     except Exception as e:
         logger.error(f"  Post creation error: {e}")
+        LAST_PUBLISH_ERROR = str(e)[:120]
         return None
 
 
@@ -129,6 +139,7 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
     Publish via webhook on the user's server. No REST API from agent = no firewall block.
     Requires deploy/fifa-agent-webhook.php on the server and WP_PUBLISH_WEBHOOK_URL + WP_PUBLISH_SECRET in env.
     """
+    global LAST_PUBLISH_ERROR
     url = config.WP_PUBLISH_WEBHOOK_URL
     secret = config.WP_PUBLISH_SECRET
     if not url or not secret:
@@ -173,15 +184,23 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
                         "status": data.get("status", status),
                     }
                 logger.error(f"  Webhook returned success=false: {data.get('message', '')}")
+                LAST_PUBLISH_ERROR = data.get("message", "success=false")
                 return None
             if r.status_code in (502, 503, 403) and attempt < 2:
                 logger.warning(f"  Webhook {r.status_code}, retrying in {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
                 continue
-            logger.error(f"  Webhook failed: HTTP {r.status_code} - {r.text[:300]}")
+            err = f"HTTP {r.status_code}"
+            if r.text and len(r.text) < 200:
+                err += f" — {r.text.strip()}"
+            else:
+                err += f" — {r.text[:150].strip()}..."
+            logger.error(f"  Webhook failed: {err}")
+            LAST_PUBLISH_ERROR = err
             return None
         except Exception as e:
             logger.warning(f"  Webhook request error (attempt {attempt + 1}/3): {e}")
+            LAST_PUBLISH_ERROR = str(e)[:150]
             if attempt < 2:
                 time.sleep(RETRY_DELAY)
     return None

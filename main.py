@@ -491,10 +491,14 @@ def _handle_approve(status="draft"):
             _pending_image_path = None
             save_pending_state()
         else:
-            send_simple_message(
-                "Publishing failed. If you use the webhook: check that fifa-agent-webhook.php is updated and "
-                "FIFA_AGENT_WEBHOOK_AUTHOR is set in wp-config. Otherwise check firewall or REST API access."
-            )
+            from publisher import wordpress_client
+            err = getattr(wordpress_client, "LAST_PUBLISH_ERROR", None)
+            msg = "Publishing failed."
+            if err:
+                msg += f" {err}"
+            else:
+                msg += " Check webhook (fifa-agent-webhook.php, FIFA_AGENT_WEBHOOK_AUTHOR) or firewall."
+            send_simple_message(msg)
     except Exception as e:
         logger.error(f"WordPress publish error: {e}")
         send_simple_message(f"Publishing error: {str(e)[:180]}")

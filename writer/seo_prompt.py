@@ -111,9 +111,9 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 
 ─── OUTPUT FORMAT: GUTENBERG BLOCKS (REQUIRED) ───
 
-**1. WRAP THE ENTIRE ARTICLE BODY in a Group block with medium padding** (so the whole text has spacing below the featured image). Start the ARTICLE BODY with:
-<!-- wp:group {{"style":{{"spacing":{{"padding":{{"top":"1.5rem","right":"1.5rem","bottom":"1.5rem","left":"1.5rem"}}}}}}}} -->
-<div class="wp-block-group" style="padding:1.5rem">
+**1. WRAP THE ENTIRE ARTICLE BODY in a Group block with padding** (top 1.5rem, sides 2rem, bottom 2.5rem). Start the ARTICLE BODY with:
+<!-- wp:group {{"style":{{"spacing":{{"padding":{{"top":"1.5rem","right":"2rem","bottom":"2.5rem","left":"2rem"}}}}}}}} -->
+<div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem">
 Then place all your blocks inside, and close with:
 </div>
 <!-- /wp:group -->
