@@ -101,6 +101,8 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 - **NO DASHES**: Do not use dashes (—) for punctuation. Use commas, colons, or periods instead.
 - **Short Paragraphs**: 2 sentences max per <p> tag to ensure high readability scores.
 
+**4. SCHEMA TAGS (CRITICAL):** The JSON-LD FAQ schema MUST be strictly wrapped in `<script type="application/ld+json">` and `</script>` tags. Without these tags, the schema will display visibly as text, which ruins the page layout. Do not forget the script tags!
+
 ─── ARTICLE STRUCTURE ───
 
 1. TITLE: SEO-optimized, under 60 chars.
@@ -138,10 +140,10 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 <h2>[Another Section Heading]</h2>
 <p>[Content...]</p>
 
-<div style="text-align: center;padding: 1.5rem;margin: 1.5rem 0;border-radius: 8px;background-color:#f0f4f8;color:#000000;">
-<p style="margin: 0 0 0.5rem 0;font-weight: 600;color:#000000;">Explore More on World Cup 2026</p>
-<p style="margin: 0;font-size: 0.95rem;color:#000000;">Stay ahead with the latest news and guides for the tournament.</p>
-</div>
+<a href="https://fifa-worldcup26.com/" style="display: block; text-decoration: none; padding: 2rem; margin: 2rem 0; border-radius: 12px; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); color: #ffffff; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.15); border-left: 5px solid #e94560;">
+<span style="display: block; font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; color: #ffffff;">Explore More on World Cup 2026</span>
+<span style="display: block; font-size: 1.1rem; color: #e2e8f0; font-weight: 400;">Stay ahead with the latest news, guides, and ticket updates for the tournament &rarr;</span>
+</a>
 
 <h2>Frequently Asked Questions</h2>
 <div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
@@ -163,6 +165,7 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 </div>
 </div>
 
+<!-- CRITICAL: DO NOT FORGET THESE SCRIPT TAGS AROUND THE JSON! -->
 <script type="application/ld+json">
 {{
   "@context": "https://schema.org",
@@ -225,7 +228,7 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[Generate the entire HTML structure exactly as specified in the HTML template above, placing everything inside the main wp-block-group div, including the FAQ section and the JSON-LD schema at the end. Output the RAW HTML directly without using ```html markdown tags!]
+[Generate the entire HTML structure exactly as specified in the HTML template above, placing everything inside the main wp-block-group div. CRITICAL: the FAQ JSON-LD schema at the end MUST be inside <script type="application/ld+json">...</script> tags, or it will break the site! Output the RAW HTML directly without using ```html markdown tags!]
 ---CONTENT_END---
 """
 
