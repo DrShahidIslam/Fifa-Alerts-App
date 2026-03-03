@@ -153,6 +153,10 @@ if (!empty($data['featured_image_base64']) && !empty($data['featured_image_filen
                 require_once ABSPATH . 'wp-admin/includes/image.php';
                 wp_generate_attachment_metadata($attach_id, $file_path);
                 $featured_id = (int) $attach_id;
+                
+                // Set the alt text for the featured image
+                $alt_text = isset($data['featured_image_alt']) ? sanitize_text_field($data['featured_image_alt']) : $title;
+                update_post_meta($featured_id, '_wp_attachment_image_alt', $alt_text);
             }
         }
     }
