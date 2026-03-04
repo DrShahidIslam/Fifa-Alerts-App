@@ -295,7 +295,23 @@ def _parse_article_output(raw_text):
         # Extract CONTENT
         content_match = re.search(r'---CONTENT_START---(.*?)---CONTENT_END---', raw_text, re.DOTALL)
         content = content_match.group(1).strip() if content_match else ""
-        
+
+        # ── Post-process: ensure FAQ schema is in <script> tags, not raw text ──
+        # 1) Extract raw JSON-LD schema from content (model sometimes dumps it as text)
+        schema_json = _extract_faqpage_json(content)
+        # 2) Strip raw schema + any mis-placed <script> schema from body
+        content = _strip_faq_and_schema_from_content(content)
+        # 3) Re-attach the schema properly wrapped in a wp:html + script block
+        if schema_json:
+            schema_block = (
+                '<!-- wp:html -->\n'
+                '<script type="application/ld+json">\n'
+                + schema_json +
+                '\n</script>\n'
+                '<!-- /wp:html -->'
+            )
+            content = content.strip() + "\n\n" + schema_block
+
         result["content"] = content
         result["full_content"] = content
         result["faq_html"] = ""

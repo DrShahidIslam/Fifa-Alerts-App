@@ -140,10 +140,11 @@ PRIMARY KEYWORD: {matched_keyword or topic_title}
 <h2>[Another Section Heading]</h2>
 <p>[Content...]</p>
 
-<a href="https://fifa-worldcup26.com/" style="display: block; text-decoration: none; padding: 2rem; margin: 2rem 0; border-radius: 12px; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); color: #ffffff; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.15); border-left: 5px solid #e94560;">
-<span style="display: block; font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; color: #ffffff;">Explore More on World Cup 2026</span>
-<span style="display: block; font-size: 1.1rem; color: #e2e8f0; font-weight: 400;">Stay ahead with the latest news, guides, and ticket updates for the tournament &rarr;</span>
-</a>
+<div style="display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;">
+<p style="font-size:1.5rem !important; font-weight:800 !important; margin:0 0 0.5rem 0 !important; text-transform:uppercase !important; letter-spacing:1px !important; color:#ffffff !important;">Explore More on World Cup 2026</p>
+<p style="font-size:1.1rem !important; color:#e2e8f0 !important; font-weight:400 !important; margin:0 0 1rem 0 !important;">Stay ahead with the latest news, guides, and ticket updates for the tournament</p>
+<a href="https://fifa-worldcup26.com/" style="display:inline-block !important; padding:0.75rem 2rem !important; background:#e94560 !important; color:#ffffff !important; text-decoration:none !important; border-radius:8px !important; font-weight:700 !important; font-size:1rem !important; letter-spacing:0.5px !important;">Visit fifa-worldcup26.com &rarr;</a>
+</div>
 
 <h2>Frequently Asked Questions</h2>
 <div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
