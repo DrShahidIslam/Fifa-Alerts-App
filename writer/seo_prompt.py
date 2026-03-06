@@ -219,6 +219,25 @@ def _save_cached_dynamic_links(links):
         pass
 
 
+def append_to_dynamic_links_cache(url):
+    """Append a newly published URL to the dynamic links cache so it can be used immediately."""
+    if not url or not _is_valid_internal_url(url):
+        return
+
+    links = _load_cached_dynamic_links()
+    if url not in links:
+        links.append(url)
+        _save_cached_dynamic_links(links)
+
+        # Update memoized cache if already loaded
+        if _INTERNAL_LINKS_CACHE["links"] is not None:
+            anchor = _slug_to_anchor(url)
+            # Check if it doesn't already exist
+            existing = [item for item in _INTERNAL_LINKS_CACHE["links"] if item["url"] == url]
+            if not existing:
+                _INTERNAL_LINKS_CACHE["links"].append({"url": url, "anchor": anchor})
+
+
 def get_verified_internal_links():
     """Return static + live-discovered internal links."""
     now = time.time()
@@ -329,7 +348,8 @@ VISUAL DESIGN LOCK (NON-NEGOTIABLE):
   display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;
   CTA button must link to https://fifa-worldcup26.com/ and keep the same button styling.
 - Include FAQ cards using this same style skeleton:
-  margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;
+  margin: 1.5rem 0;padding: 1rem;background-color:#f9f9f9;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;
+- CRITICAL: Since the site is darkly themed, you MUST ALSO add style="color:#000000;" directly to EVERY <p>, <ul>, <li>, and <h[1-6]> tag that you put inside the Key Facts callout, Important Update callout, and FAQ cards so they do not show up as invisible white text.
 
 STRUCTURE VARIATION (MANDATORY):
 - Use this variant for this article.
@@ -341,7 +361,7 @@ STRUCTURE VARIATION (MANDATORY):
 - Do not use generic headings such as "Next Section" or "Another Section".
 
 INTERNAL LINKING RULES (STRICT):
-- Use only genuine internal links from the list below. Do NOT invent URLs.
+- Use only genuine internal links from the list below. Do NOT invent URLs. If you hallucinate URLs that are not in this list, you will be penalized.
 - Include 2-3 internal links naturally where relevant.
 - Use exact URL and anchor text.
 

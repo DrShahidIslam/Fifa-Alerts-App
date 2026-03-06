@@ -15,7 +15,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import config
 from writer.source_fetcher import fetch_multiple_sources
-from writer.seo_prompt import build_article_prompt
+from writer.seo_prompt import build_article_prompt, get_verified_internal_links
 from gemini_client import generate_content_with_fallback
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def _search_news_for_trend(keyword):
     """Search Google News RSS and NewsAPI to find background context for a trending keyword."""
     urls = []
-    
+
     # 1. Google News RSS
     try:
         import feedparser
@@ -60,7 +60,7 @@ def _search_news_for_trend(keyword):
                     urls.append(url)
     except Exception as e:
         logger.warning(f"Failed to fetch NewsAPI for trend: {e}")
-        
+
     return urls
 
 
@@ -78,9 +78,9 @@ def generate_article(topic, source_urls=None):
                         content (HTML), faq_html, word_count, sources_used
         or None if generation fails
     """
-    logger.info(f"📝 Generating article for: {topic.get('topic', 'Unknown')}")
+    logger.info(f"Generating article for: {topic.get('topic', 'Unknown')}")
 
-    # ── Step 1: Gather source material ────────────────────────────
+    # Step 1: Gather source material
     if source_urls is None:
         source_urls = []
         for story in topic.get("stories", []):
@@ -102,20 +102,20 @@ def generate_article(topic, source_urls=None):
             if "trends.google.com" not in url:
                 is_pure_trend = False
                 break
-                
+
     if is_pure_trend:
         keyword = topic.get("matched_keyword") or topic.get("topic", "").replace("Rising search:", "").strip()
-        logger.info(f"  🔍 Pure trend detected. Searching active news for: '{keyword}'")
+        logger.info(f"  Pure trend detected. Searching active news for: '{keyword}'")
         found_urls = _search_news_for_trend(keyword)
         if found_urls:
             source_urls.extend(found_urls)
-            logger.info(f"  ✅ Found {len(found_urls)} background articles for context.")
+            logger.info(f"  Found {len(found_urls)} background articles for context.")
 
     logger.info(f"  Fetching {len(source_urls)} source URLs...")
     source_texts = fetch_multiple_sources(source_urls, max_sources=8)
 
     if not source_texts:
-        logger.warning("  ⚠️ No source material could be extracted. Using topic summary only.")
+        logger.warning("  No source material could be extracted. Using topic summary only.")
         # Create minimal source from story summaries
         source_texts = [{
             "title": topic.get("topic", ""),
@@ -124,36 +124,36 @@ def generate_article(topic, source_urls=None):
             "url": "",
         }]
 
-    # ── Step 2: Build the prompt ──────────────────────────────────
+    # Step 2: Build the prompt
     prompt = build_article_prompt(
         topic_title=topic.get("topic", "World Cup 2026 Update"),
         source_texts=source_texts,
         matched_keyword=topic.get("matched_keyword", "")
     )
 
-    # ── Step 3: Call Gemini (with retry) ──────────────────────────
+    # Step 3: Call Gemini (with retry)
     try:
-        logger.info("  🤖 Calling Gemini API...")
+        logger.info("  Calling Gemini API...")
         response = generate_content_with_fallback(
             model=config.GEMINI_MODEL,
             contents=prompt
         )
         raw_output = response.text
-        logger.info(f"  ✅ Gemini responded ({len(raw_output)} chars)")
+        logger.info(f"  Gemini responded ({len(raw_output)} chars)")
 
     except Exception as e:
-        logger.error(f"  ❌ Gemini API error: {e}")
+        logger.error(f"  Gemini API error: {e}")
         return None
 
-    # ── Step 4: Parse structured output ───────────────────────────
+    # Step 4: Parse structured output
     article = _parse_article_output(raw_output)
 
     if article:
         article["sources_used"] = [s.get("source_domain", "") for s in source_texts]
         article["word_count"] = len(article.get("content", "").split())
-        logger.info(f"  ✅ Article generated: '{article['title']}' ({article['word_count']} words)")
+        logger.info(f"  Article generated: '{article['title']}' ({article['word_count']} words)")
     else:
-        logger.error("  ❌ Failed to parse Gemini output")
+        logger.error("  Failed to parse Gemini output")
 
     return article
 
@@ -275,6 +275,7 @@ def _build_faqpage_json_from_content(content):
     }
     return json.dumps(schema, ensure_ascii=False, indent=2)
 
+
 def _ensure_schema_in_html_block(faq_html):
     """Strip JSON-LD from visible FAQ and put it in a single wp:html block so it never displays as text."""
     if not faq_html:
@@ -289,11 +290,10 @@ def _ensure_schema_in_html_block(faq_html):
         json_content = script_match.group(1).strip()
         schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_content + '\n</script>\n<!-- /wp:html -->'
         faq_html = re.sub(r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>', '', faq_html, flags=re.DOTALL | re.IGNORECASE)
-    # 2) Raw JSON-LD (no script tag) — model often outputs this; strip and wrap so it never shows as text
+    # 2) Raw JSON-LD (no script tag)
     json_str = _extract_faqpage_json(faq_html)
     if json_str:
         schema_block = '<!-- wp:html -->\n<script type="application/ld+json">\n' + json_str + '\n</script>\n<!-- /wp:html -->'
-        # Remove the raw JSON from faq_html (match by start and length since content may repeat)
         idx = faq_html.find(json_str[:50])
         if idx != -1:
             end = idx + len(json_str)
@@ -307,16 +307,14 @@ def _ensure_schema_in_html_block(faq_html):
 
 
 def _strip_faq_and_schema_from_content(content):
-    """Remove FAQ section and JSON-LD schema if the model wrongly put them inside CONTENT (keeps order correct, no duplicates)."""
+    """Remove FAQ section and JSON-LD schema if the model wrongly put them inside CONTENT."""
     if not content:
         return content
-    # Remove raw JSON-LD (visible schema text) using brace matching
     while True:
         json_str = _extract_faqpage_json(content)
         if not json_str:
             break
         content = content.replace(json_str, "", 1).strip()
-    # Remove script-based schema from content (should only be in FAQ)
     content = re.sub(
         r'<script\s+type=["\']application/ld\+json["\']\s*>.*?</script>\s*',
         '',
@@ -327,16 +325,57 @@ def _strip_faq_and_schema_from_content(content):
 
 
 def _wrap_content_with_padding(content):
-    """Wrap article content in a Group block with padding for Kadence (more on sides and bottom)."""
+    """Wrap article content in a Group block with padding for Kadence."""
     if not content or "wp:group" in content.strip()[:250]:
         return content
-    # top 1.5rem, right/left 2rem, bottom 2.5rem
     return (
         '<!-- wp:group {"style":{"spacing":{"padding":{"top":"1.5rem","right":"2rem","bottom":"2.5rem","left":"2rem"}}}} -->\n'
         '<div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem">\n\n'
         + content.strip() + "\n\n"
         + '</div>\n<!-- /wp:group -->'
     )
+
+
+def _clean_hallucinated_links(content):
+    """
+    Find all internal links in the content, and if they do not exist
+    in our verified links list, replace the <a> tag with just the anchor text.
+    This prevents hallucinated URLs from hurting SEO.
+    """
+    if not content:
+        return content
+
+    verified = get_verified_internal_links()
+    valid_urls = [item["url"] for item in verified]
+
+    def _replace_link(match):
+        href = match.group(1)
+        anchor_text = match.group(2)
+        href_clean = href.strip()
+
+        # External links are fine, only check our domain
+        if "fifa-worldcup26.com" not in href_clean and not href_clean.startswith("/"):
+            return match.group(0)
+
+        # Build absolute if relative
+        if href_clean.startswith("/"):
+            href_clean = f"https://fifa-worldcup26.com{href_clean}"
+
+        # If the generated URL isn't in our valid list, strip the link tag
+        if href_clean not in valid_urls:
+            logger.warning(f"Stripped hallucinated link: {href_clean}")
+            return anchor_text
+
+        return match.group(0)
+
+    cleaned = re.sub(
+        r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        _replace_link,
+        content,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+
+    return cleaned
 
 
 def _parse_article_output(raw_text):
@@ -393,6 +432,9 @@ def _parse_article_output(raw_text):
             )
             content = content.strip() + "\n\n" + schema_block
 
+        # 5) Clean out hallucinated internal URLs
+        content = _clean_hallucinated_links(content)
+
         result["content"] = content
         result["full_content"] = content
         result["faq_html"] = ""
@@ -400,7 +442,6 @@ def _parse_article_output(raw_text):
         # Validate we got essential fields
         if not result["title"] or not result["content"]:
             logger.warning("Missing essential fields, attempting raw extraction...")
-            # Fallback: use the entire output as content
             if not result["title"]:
                 first_line = raw_text.strip().split("\n")[0]
                 result["title"] = re.sub(r'^#+\s*', '', first_line)[:60]
@@ -444,5 +485,3 @@ if __name__ == "__main__":
         print(f"WORDS: {article['word_count']}")
         print(f"SOURCES: {', '.join(article['sources_used'])}")
         print(f"\nCONTENT PREVIEW:\n{article['content'][:500]}...")
-
-

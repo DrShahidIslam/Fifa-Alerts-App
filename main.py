@@ -34,6 +34,8 @@ from notifications.telegram_bot import (
 from database.db import get_connection, cleanup_old_data, mark_notified, record_notification, save_topic_to_cache, get_topic_from_cache
 from writer.article_generator import generate_article
 from publisher.wordpress_client import create_post
+from writer.seo_prompt import append_to_dynamic_links_cache
+
 from publisher.image_handler import generate_featured_image
 from gemini_client import generate_content_with_fallback
 
@@ -525,7 +527,13 @@ def _handle_approve(status="draft"):
             img_note = " (with featured image)" if _pending_image_path else ""
             send_publish_confirmation(result["post_url"], _pending_article["title"], post_id=result["post_id"], status=status)
             logger.info(f"✅ Published{img_note}: {result['post_url']}")
+
+            # Append the new URL to the internal links cache for future articles
+            if result.get("post_url"):
+                append_to_dynamic_links_cache(result["post_url"])
+
             _pending_article = None
+
             _pending_image_path = None
             save_pending_state()
         else:
@@ -576,8 +584,10 @@ def _handle_publish_draft(post_id):
     try:
         url = update_post_status(post_id, "publish")
         if url:
+            append_to_dynamic_links_cache(url)
             send_simple_message(f"🚀 Draft published successfully!\n🔗 {url}")
             logger.info(f"✅ Draft {post_id} published: {url}")
+
         else:
             send_simple_message("❌ Failed to publish draft. Check logs.")
     except Exception as e:
