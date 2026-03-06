@@ -1,8 +1,25 @@
-"""
-SEO Prompt Template — Master prompt used for Gemini article generation.
-Enforces SEO best practices, your site's editorial style, and internal linking.
+﻿"""
+SEO Prompt Template - Master prompt used for Gemini article generation.
+Enforces SEO best practices, editorial style, and internal linking.
 All URLs below are real pages on fifa-worldcup26.com; do not add or invent others.
 """
+
+import hashlib
+import json
+import logging
+import os
+import re
+import time
+import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
+
+import requests
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+import config
+
+logger = logging.getLogger(__name__)
 
 # Real internal links only (from site). Add new blog posts here as they are published.
 # Model must ONLY use links from this list; never hallucinate URLs.
@@ -48,6 +65,200 @@ INTERNAL_LINKS = {
     "messi_miami_comeback": {"url": "https://fifa-worldcup26.com/messis-first-goals-ignite-miami-comeback/", "anchor": "Messi's first goals and Miami comeback"},
 }
 
+_INTERNAL_LINKS_CACHE = {"loaded_at": 0, "links": None}
+_INTERNAL_LINKS_CACHE_TTL_SECONDS = 6 * 60 * 60
+_INTERNAL_LINKS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "internal_links_cache.json")
+
+ARTICLE_STRUCTURE_VARIANTS = [
+    {
+        "id": "A",
+        "name": "Summary First",
+        "instructions": (
+            "Start with a direct summary section that answers the main query immediately. "
+            "Then include a key facts callout, then context and implications, then the important update callout, "
+            "then outlook and next steps, then CTA, then FAQ."
+        ),
+    },
+    {
+        "id": "B",
+        "name": "Timeline First",
+        "instructions": (
+            "Start with what happened today and a short timeline section. "
+            "Move to analysis and entity relationships. Place key facts callout after timeline, "
+            "then important update callout, then practical implications, then CTA, then FAQ."
+        ),
+    },
+    {
+        "id": "C",
+        "name": "Analysis First",
+        "instructions": (
+            "Open with why this matters and who is affected. "
+            "Then cover confirmed facts and evidence with the key facts callout, then implications and scenarios, "
+            "then important update callout, then what to watch next, then CTA, then FAQ."
+        ),
+    },
+    {
+        "id": "D",
+        "name": "Fan Guide Angle",
+        "instructions": (
+            "Begin with a practical fan-focused overview. "
+            "Then provide confirmed facts in the key facts callout, then explain schedule, teams, or travel impact, "
+            "then important update callout, then strategic takeaways, then CTA, then FAQ."
+        ),
+    },
+]
+
+
+def _slug_to_anchor(url):
+    """Create a human anchor text from URL slug."""
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return "World Cup 2026 hub"
+    slug = path.split("/")[-1]
+    words = [w for w in re.split(r"[-_]+", slug) if w]
+    if not words:
+        return "World Cup 2026 updates"
+    pretty = " ".join(words[:6]).strip()
+    return pretty[:1].upper() + pretty[1:]
+
+
+def _is_valid_internal_url(url):
+    if not url or "wp-content" in url or "wp-json" in url or "xmlrpc.php" in url:
+        return False
+    if any(x in url for x in ("/feed", "/tag/", "/author/", "/comments/", ".jpg", ".png", ".webp", ".svg", ".pdf")):
+        return False
+    return url.startswith(config.WP_URL.rstrip("/") + "/")
+
+
+def _extract_urls_from_sitemap_xml(xml_text):
+    """Extract URLs from XML sitemap or sitemap index."""
+    urls = []
+    try:
+        root = ET.fromstring(xml_text.encode("utf-8") if isinstance(xml_text, str) else xml_text)
+        ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        for node in root.findall(".//sm:loc", ns):
+            if node.text:
+                urls.append(node.text.strip())
+    except Exception:
+        pass
+    return urls
+
+
+def _fetch_dynamic_internal_links(max_links=40):
+    """Discover verified internal URLs from live sitemap files."""
+    base = config.WP_URL.rstrip("/")
+    sitemap_candidates = [f"{base}/sitemap_index.xml", f"{base}/sitemap.xml"]
+    headers = {"User-Agent": "FIFANewsAgent/1.0"}
+    timeout = 12
+
+    discovered_urls = []
+    child_sitemaps = []
+    for sm in sitemap_candidates:
+        try:
+            r = requests.get(sm, headers=headers, timeout=timeout)
+            if r.status_code == 200 and r.text:
+                locs = _extract_urls_from_sitemap_xml(r.text)
+                if locs:
+                    child_sitemaps.extend(locs)
+        except Exception:
+            continue
+
+    prioritized = []
+    for loc in child_sitemaps:
+        if any(k in loc for k in ("post-sitemap", "news-sitemap", "page-sitemap", "category-sitemap")):
+            prioritized.append(loc)
+    for loc in child_sitemaps:
+        if loc not in prioritized:
+            prioritized.append(loc)
+
+    for sm in prioritized[:12]:
+        try:
+            r = requests.get(sm, headers=headers, timeout=timeout)
+            if r.status_code != 200:
+                continue
+            for loc in _extract_urls_from_sitemap_xml(r.text):
+                if _is_valid_internal_url(loc):
+                    discovered_urls.append(loc)
+                if len(discovered_urls) >= max_links:
+                    break
+            if len(discovered_urls) >= max_links:
+                break
+        except Exception:
+            continue
+
+    unique = []
+    seen = set()
+    for u in discovered_urls:
+        if u not in seen:
+            seen.add(u)
+            unique.append(u)
+    return unique[:max_links]
+
+
+def _load_cached_dynamic_links():
+    try:
+        if os.path.exists(_INTERNAL_LINKS_FILE):
+            with open(_INTERNAL_LINKS_FILE, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            if isinstance(payload, dict):
+                links = payload.get("links") or []
+                updated_at = float(payload.get("updated_at", 0))
+                if links and (time.time() - updated_at) < _INTERNAL_LINKS_CACHE_TTL_SECONDS:
+                    return [l for l in links if isinstance(l, str)]
+    except Exception:
+        pass
+    return []
+
+
+def _save_cached_dynamic_links(links):
+    try:
+        payload = {"updated_at": time.time(), "links": links}
+        with open(_INTERNAL_LINKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+    except Exception:
+        pass
+
+
+def get_verified_internal_links():
+    """Return static + live-discovered internal links."""
+    now = time.time()
+    if _INTERNAL_LINKS_CACHE["links"] and (now - _INTERNAL_LINKS_CACHE["loaded_at"]) < _INTERNAL_LINKS_CACHE_TTL_SECONDS:
+        return _INTERNAL_LINKS_CACHE["links"]
+
+    merged = []
+    seen_urls = set()
+
+    for info in INTERNAL_LINKS.values():
+        url = info.get("url", "").strip()
+        anchor = info.get("anchor", "").strip()
+        if not url or not anchor:
+            continue
+        if url not in seen_urls:
+            seen_urls.add(url)
+            merged.append({"url": url, "anchor": anchor})
+
+    dynamic = _load_cached_dynamic_links()
+    if not dynamic:
+        dynamic = _fetch_dynamic_internal_links(max_links=60)
+        if dynamic:
+            _save_cached_dynamic_links(dynamic)
+
+    for url in dynamic:
+        if url not in seen_urls and _is_valid_internal_url(url):
+            seen_urls.add(url)
+            merged.append({"url": url, "anchor": _slug_to_anchor(url)})
+
+    _INTERNAL_LINKS_CACHE["links"] = merged
+    _INTERNAL_LINKS_CACHE["loaded_at"] = now
+    return merged
+
+
+def _select_article_variant(topic_title, matched_keyword):
+    """Pick a deterministic structure variant by topic."""
+    seed = f"{topic_title}|{matched_keyword}".encode("utf-8")
+    idx = int(hashlib.sha256(seed).hexdigest(), 16) % len(ARTICLE_STRUCTURE_VARIANTS)
+    return ARTICLE_STRUCTURE_VARIANTS[idx]
+
 
 def build_article_prompt(topic_title, source_texts, matched_keyword=""):
     """
@@ -61,7 +272,6 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
     Returns:
         str: The complete prompt for Gemini
     """
-    # Build source context block
     sources_block = ""
     for i, src in enumerate(source_texts[:5], 1):
         sources_block += f"""
@@ -69,155 +279,81 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
 {src.get('text', '')[:2000]}
 """
 
-    # Build internal links suggestion
+    variant = _select_article_variant(topic_title, matched_keyword or topic_title)
+
+    verified_links = get_verified_internal_links()
     links_suggestion = "\n".join([
-        f"  - [{info['anchor']}]({info['url']})"
-        for key, info in INTERNAL_LINKS.items()
+        f"  - [{item['anchor']}]({item['url']})"
+        for item in verified_links[:80]
     ])
 
     prompt = f"""You are an expert sports journalist and master of Semantic Search, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization) for fifa-worldcup26.com.
-Your articles must be engineered to rank instantly by providing high information density, clear entity relationships, and direct answers.
+Your articles must be engineered to rank by providing high information density, clear entity relationships, and direct answers.
 
 TASK: Write a complete, publish-ready article about the following trending topic.
 
 TRENDING TOPIC: {topic_title}
 PRIMARY KEYWORD: {matched_keyword or topic_title}
 
-─── SOURCE MATERIAL (use ONLY these facts, do NOT fabricate) ───
+--- SOURCE MATERIAL (use ONLY these facts, do NOT fabricate) ---
 {sources_block}
 
-─── ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ───
+--- ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ---
 
-**1. KEYWORD DENSITY:** Ensure the primary keyword density is **strictly below 0.8%** in the paragraph text. Avoid keyword stuffing. Use synonyms and related entities instead.
+1) KEYWORD DENSITY: Ensure primary keyword density is strictly below 0.8 percent in paragraph text. Avoid stuffing.
+2) AEO and GEO: Use direct answers, clear entity linking, and highly parseable factual sentences.
+3) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
+4) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
 
-**2. AEO & GEO OPTIMIZATION:**
-- Use **Answer Language Processing (ALP)**: Provide direct, factual, and concise answers to the core questions implied by the topic.
-- **Entity-Focused Writing**: Explicitly mention and connect key entities (players, teams, venues, cities, dates). Use full names and titles.
-- Structure data for **Generative Search Engines**: Use clear, declarative sentences that are easy for AI models to parse and cite.
-- **EEAT**: Demonstrate expert-level insight by synthesizing source facts into a cohesive narrative with logical conclusions.
-
-**3. STYLE CONSTRAINTS:**
-- **NO EMOJIS**: Strictly prohibited in the article body and headings.
-- **NO DASHES**: Do not use dashes (—) for punctuation. Use commas, colons, or periods instead.
-- **Short Paragraphs**: 2 sentences max per <p> tag to ensure high readability scores.
-
-**4. SCHEMA TAGS (CRITICAL):** The JSON-LD FAQ schema MUST be strictly wrapped in `<script type="application/ld+json">` and `</script>` tags. Without these tags, the schema will display visibly as text, which ruins the page layout. Do not forget the script tags!
-
-─── ARTICLE STRUCTURE ───
+--- ARTICLE STRUCTURE ---
 
 1. TITLE: SEO-optimized, under 60 chars.
-2. META_DESCRIPTION: 150-155 characters. Start with an action verb.
-3. SLUG: Keyword-rich, lowercase, hyphens only.
-4. ARTICLE BODY: Magazine-quality HTML (design details below).
+2. META_DESCRIPTION: 150-155 chars, starts with an action verb.
+3. SLUG: keyword-rich, lowercase, hyphens only.
+4. ARTICLE BODY: Magazine-quality HTML.
 5. FAQ: 3-4 schema-ready questions.
 
-**1. NO WORDPRESS BLOCK COMMENTS**: Do NOT output any `<!-- wp:... -->` comments. Produce strictly raw HTML.
+RULES:
+- Do NOT output any <!-- wp:... --> comments.
+- Output strictly raw HTML inside content.
 
-**2. FOLLOW THIS EXACT HTML TEMPLATE** (Copy the structure and inline styles exactly as shown here):
+VISUAL DESIGN LOCK (NON-NEGOTIABLE):
+- Keep the exact same visual style system for every article: same padding, colors, border styles, and CTA look.
+- Use this exact wrapper and style attributes:
+  <div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem"> ... </div>
+- Include one Key Facts style callout using this exact style string:
+  border-left: 4px solid #e94560;padding: 1rem 1.25rem;margin: 1.5rem 0;border-radius: 0 8px 8px 0;background-color:#f9f9f9;color:#000000;
+- Include one Important Update style callout using this exact style string:
+  padding: 1rem 1.25rem;margin: 1.5rem 0;border: 1px solid #ffc107;border-radius: 8px;background-color:#fffdf5;color:#000000;
+- Include this exact CTA block style and button style:
+  display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;
+  CTA button must link to https://fifa-worldcup26.com/ and keep the same button styling.
+- Include FAQ cards using this same style skeleton:
+  margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;
 
-<div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem">
-
-<h2 class="wp-block-heading">[Your Main Heading]</h2>
-<p>[Your introductory text goes here...]</p>
-<p>[More text...]</p>
-
-<div style="border-left: 4px solid #e94560;padding: 1rem 1.25rem;margin: 1.5rem 0;border-radius: 0 8px 8px 0;background-color:#f9f9f9;color:#000000;">
-<h3 style="margin: 0 0 0.75rem 0;font-size: 1.1rem;color:#000000;">Key Facts</h3>
-<ul style="margin: 0;padding-left: 1.25rem;line-height: 1.6;color:#000000;">
-<li>[Fact 1]</li>
-<li>[Fact 2]</li>
-<li>[Fact 3]</li>
-</ul>
-</div>
-
-<h2>[Next Section Heading]</h2>
-<p>[Section text... example internal link: <a href="https://fifa-worldcup26.com/news/">latest World Cup news</a>...]</p>
-
-<div style="padding: 1rem 1.25rem;margin: 1.5rem 0;border: 1px solid #ffc107;border-radius: 8px;background-color:#fffdf5;color:#000000;">
-<strong>Important Update:</strong> [A crucial highlight or takeaway from the article.]
-</div>
-
-<h2>[Another Section Heading]</h2>
-<p>[Content...]</p>
-
-<div style="display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;">
-<p style="font-size:1.5rem !important; font-weight:800 !important; margin:0 0 0.5rem 0 !important; text-transform:uppercase !important; letter-spacing:1px !important; color:#ffffff !important;">Explore More on World Cup 2026</p>
-<p style="font-size:1.1rem !important; color:#e2e8f0 !important; font-weight:400 !important; margin:0 0 1rem 0 !important;">Stay ahead with the latest news, guides, and ticket updates for the tournament</p>
-<a href="https://fifa-worldcup26.com/" style="display:inline-block !important; padding:0.75rem 2rem !important; background:#e94560 !important; color:#ffffff !important; text-decoration:none !important; border-radius:8px !important; font-weight:700 !important; font-size:1rem !important; letter-spacing:0.5px !important;">Visit fifa-worldcup26.com &rarr;</a>
-</div>
-
-<h2>Frequently Asked Questions</h2>
-<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
-<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
-<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 1?]</h3>
-<p style="margin: 0;color:#000000;">[Answer to Question 1.]</p>
-</div>
-</div>
-<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
-<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
-<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 2?]</h3>
-<p style="margin: 0;color:#000000;">[Answer to Question 2.]</p>
-</div>
-</div>
-<div style="margin: 1.5rem 0;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;">
-<div style="padding: 1rem 1.25rem;background-color:#fafafa;">
-<h3 style="margin: 0 0 0.5rem 0;font-size: 1.1rem;color:#000000;">[Question 3?]</h3>
-<p style="margin: 0;color:#000000;">[Answer to Question 3.]</p>
-</div>
-</div>
-
-<!-- CRITICAL: DO NOT FORGET THESE SCRIPT TAGS AROUND THE JSON! -->
-<script type="application/ld+json">
-{{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {{
-      "@type": "Question",
-      "name": "[Question 1?]",
-      "acceptedAnswer": {{
-        "@type": "Answer",
-        "text": "[Answer to Question 1.]"
-      }}
-    }},
-    {{
-      "@type": "Question",
-      "name": "[Question 2?]",
-      "acceptedAnswer": {{
-        "@type": "Answer",
-        "text": "[Answer to Question 2.]"
-      }}
-    }},
-    {{
-      "@type": "Question",
-      "name": "[Question 3?]",
-      "acceptedAnswer": {{
-        "@type": "Answer",
-        "text": "[Answer to Question 3.]"
-      }}
-    }}
-  ]
-}}
-</script>
-</div>
+STRUCTURE VARIATION (MANDATORY):
+- Use this variant for this article.
+- Variant ID: {variant['id']}
+- Variant Name: {variant['name']}
+- Variant Guide: {variant['instructions']}
+- Keep all mandatory blocks: key facts callout, important update callout, CTA block, FAQ plus JSON-LD.
+- Use 4-6 topical sections with unique H2 headings based on the story.
+- Do not use generic headings such as "Next Section" or "Another Section".
 
 INTERNAL LINKING RULES (STRICT):
-- The internal links MUST BE GENUINE. I mean ONLY use our original links from the list below. Do NOT invent, guess, or hallucinate any internal URL.
-- Include 2-3 genuine internal links, naturally placed where they fit the topic.
-- Use the exact URL and suggested anchor text from the list. Format: <a href="EXACT_URL">anchor text</a>
+- Use only genuine internal links from the list below. Do NOT invent URLs.
+- Include 2-3 internal links naturally where relevant.
+- Use exact URL and anchor text.
 
 Allowed genuine internal links (copy URL and anchor exactly):
 {links_suggestion}
 
 EDITORIAL GUIDELINES:
-- Tone: Authoritative but conversational. Write like a knowledgeable friend, not a textbook.
-- Word count: 800-1500 words
-- NEVER fabricate facts, quotes, scores, or dates. Only use information from the provided sources.
+- Tone: authoritative but conversational.
+- Word count: 800-1500 words.
+- Never fabricate facts, quotes, scores, or dates.
 - If sources conflict, mention both perspectives.
-- Use short paragraphs (2-3 sentences max per paragraph).
-- Include transition words for SEO readability.
-- Reference "the tournament" or "the 2026 World Cup" naturally — don't keyword-stuff.
-- This is an UNOFFICIAL fan guide. Never claim to represent FIFA.
+- This is an unofficial fan guide. Never claim to represent FIFA.
 
 OUTPUT FORMAT:
 Return your response in this exact structured format:
@@ -229,7 +365,7 @@ TAGS: [tag1, tag2, tag3, ...]
 CATEGORY: News
 
 ---CONTENT_START---
-[Generate the entire HTML structure exactly as specified in the HTML template above, placing everything inside the main wp-block-group div. CRITICAL: the FAQ JSON-LD schema at the end MUST be inside <script type="application/ld+json">...</script> tags, or it will break the site! Output the RAW HTML directly without using ```html markdown tags!]
+[Generate raw HTML only. Keep the exact visual design styles above, but follow the selected variant for section order and heading flow. Put FAQ JSON-LD inside <script type="application/ld+json">...</script>. Do not use ```html markdown tags.]
 ---CONTENT_END---
 """
 

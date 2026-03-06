@@ -1,4 +1,4 @@
-"""
+﻿"""
 Central configuration for the FIFA World Cup 2026 News Agent.
 All settings, keywords, RSS feeds, and thresholds are defined here.
 """
@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── API Keys ──────────────────────────────────────────────────────────
+# â”€â”€ API Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
@@ -23,7 +23,7 @@ WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
 WP_PUBLISH_WEBHOOK_URL = os.getenv("WP_PUBLISH_WEBHOOK_URL", "").strip()
 WP_PUBLISH_SECRET = os.getenv("WP_PUBLISH_SECRET", "").strip()
 
-# ── RSS Feeds ─────────────────────────────────────────────────────────
+# â”€â”€ RSS Feeds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 RSS_FEEDS = {
     "ESPN FIFA": "https://www.espn.com/espn/rss/soccer/news",
     "BBC Sport Football": "http://feeds.bbci.co.uk/sport/football/rss.xml",
@@ -34,10 +34,10 @@ RSS_FEEDS = {
     "Reuters Soccer": "https://www.reuters.com/rssFeed/sportsNews",
 }
 
-# ── General Football Mode ────────────────────────────────────────────
+# â”€â”€ General Football Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # When True, football-specific RSS feeds pass ALL stories without keyword
 # filtering. Set to False for strict FIFA 2026 World Cup focus.
-GENERAL_FOOTBALL_MODE = False
+GENERAL_FOOTBALL_MODE = True
 
 # RSS feeds that are football-only (only used when general mode is on)
 FOOTBALL_ONLY_FEEDS = [
@@ -45,8 +45,8 @@ FOOTBALL_ONLY_FEEDS = [
     "The Guardian Football", "Sky Sports Football",
 ]
 
-# ── Keyword Watchlists ────────────────────────────────────────────────
-# Primary keywords — FIFA World Cup 2026 and variants
+# â”€â”€ Keyword Watchlists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Primary keywords â€” FIFA World Cup 2026 and variants
 PRIMARY_KEYWORDS = [
     "world cup 2026", "fifa 2026", "fifa world cup",
     "world cup qualifier", "world cup qualification",
@@ -59,8 +59,10 @@ PRIMARY_KEYWORDS = [
     "wc 2026", "wc2026",
 ]
 
-# General football keywords — KEPT for reference but NOT included in ALL_KEYWORDS
+# General football keywords â€” KEPT for reference but NOT included in ALL_KEYWORDS
 # to maintain strict FIFA 2026 focus. Re-add to ALL_KEYWORDS if you want broader coverage.
+INCLUDE_GENERAL_FOOTBALL_KEYWORDS = True
+
 GENERAL_FOOTBALL_KEYWORDS = [
     "football", "soccer",
     "champions league", "europa league", "conference league",
@@ -75,7 +77,7 @@ GENERAL_FOOTBALL_KEYWORDS = [
     "var", "offside", "golden boot", "ballon d'or",
 ]
 
-# Exclusion keywords — stories/trends containing these are discarded
+# Exclusion keywords â€” stories/trends containing these are discarded
 EXCLUDE_KEYWORDS = [
     # Cricket
     "t20", "cricket", "ipl", "odi", "test match",
@@ -92,7 +94,7 @@ EXCLUDE_KEYWORDS = [
     "cycling", "wrestling", "snooker", "winter olympics", "skiing",
 ]
 
-# Team keywords — national teams only (no clubs to avoid league noise)
+# Team keywords â€” national teams only (no clubs to avoid league noise)
 TEAM_KEYWORDS = [
     # Host nations
     "usa soccer", "us men's national team", "usmnt",
@@ -112,7 +114,7 @@ TEAM_KEYWORDS = [
     "bosnia", "northern ireland", "georgia", "iceland",
 ]
 
-# Player keywords — stars fans search for (no "world cup" suffix needed)
+# Player keywords â€” stars fans search for (no "world cup" suffix needed)
 PLAYER_KEYWORDS = [
     "messi", "ronaldo", "mbappe", "haaland", "bellingham",
     "vinicius", "salah", "kane", "de bruyne",
@@ -144,27 +146,28 @@ LOGISTICS_KEYWORDS = [
 ]
 
 # Combined master list for filtering (GENERAL_FOOTBALL_KEYWORDS excluded for strict WC focus)
-ALL_KEYWORDS = (
-    PRIMARY_KEYWORDS + TEAM_KEYWORDS +
-    PLAYER_KEYWORDS + VENUE_KEYWORDS + LOGISTICS_KEYWORDS
-)
+_base_keywords = PRIMARY_KEYWORDS + TEAM_KEYWORDS + PLAYER_KEYWORDS + VENUE_KEYWORDS + LOGISTICS_KEYWORDS
+if GENERAL_FOOTBALL_MODE and INCLUDE_GENERAL_FOOTBALL_KEYWORDS:
+    ALL_KEYWORDS = _base_keywords + GENERAL_FOOTBALL_KEYWORDS
+else:
+    ALL_KEYWORDS = _base_keywords
 
-# ── Detection Settings ────────────────────────────────────────────────
+# â”€â”€ Detection Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 SPIKE_THRESHOLD = 2.0           # 2x above the rolling average = spike
-SPIKE_MIN_SCORE = 40            # Minimum spike score to trigger alert (was 15)
+SPIKE_MIN_SCORE = 35            # Minimum spike score to trigger alert
 ROLLING_WINDOW_HOURS = 24       # Baseline window for comparison
 SCAN_INTERVAL_MINUTES = 60      # How often the agent scans (60m = 24 req/day, well within NewsAPI 100 limit)
 DEDUP_WINDOW_HOURS = 168        # Don't re-alert about the same story within 7 days
 
-# ── Google Trends Settings ────────────────────────────────────────────
+# â”€â”€ Google Trends Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TRENDS_GEO = ""                 # Worldwide (empty = global)
 TRENDS_KEYWORDS_PER_BATCH = 5   # pytrends allows max 5 keywords per request
 
-# ── WordPress Settings ────────────────────────────────────────────────
-WP_DEFAULT_CATEGORY = "Blog"
+# â”€â”€ WordPress Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+WP_DEFAULT_CATEGORY = "News"
 WP_DEFAULT_STATUS = "draft"     # 'draft', 'pending', or 'publish'
 
-# ── Article Generation Settings ────────────────────────────────────────
+# â”€â”€ Article Generation Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ARTICLE_MIN_WORDS = 800
 ARTICLE_MAX_WORDS = 1500
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -173,6 +176,6 @@ SKIP_AI_IMAGE = os.getenv("SKIP_AI_IMAGE", "false").lower() in ("true", "1", "ye
 # Imagen is paid-only; set True only if you have a paid Gemini plan. Free tier uses Pollinations + placeholder.
 USE_GEMINI_IMAGEN = os.getenv("USE_GEMINI_IMAGEN", "false").lower() in ("true", "1", "yes")
 
-# ── Logging ───────────────────────────────────────────────────────────
+# â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 LOG_FILE = "agent.log"
 LOG_LEVEL = "INFO"

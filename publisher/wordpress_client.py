@@ -37,6 +37,41 @@ HEADERS = {
 }
 
 
+def _validate_article_before_publish(article):
+    """Pre-publish QA gate for FAQ schema."""
+    errors = []
+    warnings = []
+
+    content = (article.get("full_content") or article.get("content") or "").strip()
+    if not content:
+        errors.append("Missing article content")
+        return errors, warnings
+
+    content_lower = content.lower()
+    has_faq_heading = bool(
+        re.search(
+            r"<h[23][^>]*>\s*(?:frequently\s+asked\s+questions|faqs?)\s*</h[23]>",
+            content,
+            re.IGNORECASE,
+        )
+    )
+    has_faq_like_items = len(
+        re.findall(
+            r"<h3[^>]*>\s*.*?\?\s*</h3>\s*<p[^>]*>",
+            content,
+            re.IGNORECASE | re.DOTALL,
+        )
+    ) >= 2
+
+    if has_faq_heading or has_faq_like_items:
+        if "application/ld+json" not in content_lower:
+            errors.append("FAQ section found but JSON-LD script is missing")
+        elif "faqpage" not in content_lower:
+            errors.append("FAQ section found but FAQPage schema is missing")
+
+    return errors, warnings
+
+
 def create_post(article, featured_image_path=None, status=None):
     """
     Create a WordPress post from an article dict.
@@ -48,6 +83,14 @@ def create_post(article, featured_image_path=None, status=None):
 
     global LAST_PUBLISH_ERROR
     LAST_PUBLISH_ERROR = None
+
+    qa_errors, qa_warnings = _validate_article_before_publish(article)
+    for warning in qa_warnings:
+        logger.warning(f"  QA warning: {warning}")
+    if qa_errors:
+        LAST_PUBLISH_ERROR = "Pre-publish QA failed: " + "; ".join(qa_errors[:4])
+        logger.error(f"  {LAST_PUBLISH_ERROR}")
+        return None
     if getattr(config, "WP_PUBLISH_WEBHOOK_URL", None) and getattr(config, "WP_PUBLISH_SECRET", None):
         out = _publish_via_webhook(article, featured_image_path, status)
         if out is None and LAST_PUBLISH_ERROR:
@@ -492,3 +535,4 @@ if __name__ == "__main__":
         print("✅ WordPress connection successful!")
     else:
         print("❌ WordPress connection failed!")
+

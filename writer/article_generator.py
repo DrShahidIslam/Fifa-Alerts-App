@@ -3,8 +3,10 @@ Article Generator — Uses Gemini to write SEO-optimized articles
 from source material gathered by the source fetcher.
 """
 import logging
+import json
 import re
 import time
+import html
 
 from google import genai
 
@@ -157,45 +159,121 @@ def generate_article(topic, source_urls=None):
 
 
 def _extract_faqpage_json(text):
-    """Extract raw FAQPage JSON-LD from text (brace matching so we get the full object). Returns None if not found."""
+    """Extract FAQPage JSON-LD from text. Returns None if FAQPage is not present."""
+    if not text:
+        return None
+
+    # Prefer script blocks with FAQPage schema.
+    for m in re.finditer(
+        r'<script\s+type=["\']application/ld\+json["\']\s*>(.*?)</script>',
+        text,
+        re.DOTALL | re.IGNORECASE
+    ):
+        body = (m.group(1) or "").strip()
+        if "FAQPage" in body:
+            return body
+
+    # Fallback: raw JSON objects (sometimes model emits JSON without script tags).
     for start_marker in ('{"@context"', '{ "@context"', "{'@context'"):
-        start = text.find(start_marker)
-        if start == -1:
-            continue
-        depth = 0
-        in_string = False
-        escape = False
-        quote = None
-        i = start
-        while i < len(text):
-            c = text[i]
-            if escape:
-                escape = False
+        search_from = 0
+        while True:
+            start = text.find(start_marker, search_from)
+            if start == -1:
+                break
+            depth = 0
+            in_string = False
+            escape = False
+            quote = None
+            i = start
+            while i < len(text):
+                c = text[i]
+                if escape:
+                    escape = False
+                    i += 1
+                    continue
+                if c == '\\' and in_string:
+                    escape = True
+                    i += 1
+                    continue
+                if in_string:
+                    if c == quote:
+                        in_string = False
+                    i += 1
+                    continue
+                if c in ('"', "'"):
+                    in_string = True
+                    quote = c
+                    i += 1
+                    continue
+                if c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[start:i + 1].strip()
+                        if "FAQPage" in candidate:
+                            return candidate
+                        search_from = i + 1
+                        break
                 i += 1
-                continue
-            if c == '\\' and in_string:
-                escape = True
-                i += 1
-                continue
-            if in_string:
-                if c == quote:
-                    in_string = False
-                i += 1
-                continue
-            if c in ('"', "'"):
-                in_string = True
-                quote = c
-                i += 1
-                continue
-            if c == '{':
-                depth += 1
-            elif c == '}':
-                depth -= 1
-                if depth == 0:
-                    return text[start:i + 1].strip()
-            i += 1
+            else:
+                break
     return None
 
+
+def _extract_faq_pairs(content, max_pairs=4):
+    """Extract FAQ Q/A pairs from HTML content."""
+    if not content:
+        return []
+
+    faq_start = re.search(
+        r'<h[23][^>]*>\s*(?:Frequently\s+Asked\s+Questions|FAQs?)\s*</h[23]>',
+        content,
+        re.IGNORECASE
+    )
+    segment = content[faq_start.start():] if faq_start else content
+
+    pairs = []
+    for q_html, a_html in re.findall(
+        r'<h3[^>]*>\s*(.*?)\s*</h3>\s*<p[^>]*>\s*(.*?)\s*</p>',
+        segment,
+        re.IGNORECASE | re.DOTALL
+    ):
+        question = html.unescape(re.sub(r'<[^>]+>', '', q_html)).strip()
+        answer = html.unescape(re.sub(r'<[^>]+>', '', a_html)).strip()
+        if not question or not answer:
+            continue
+        if len(answer) < 20:
+            continue
+        if "?" not in question:
+            question = question.rstrip(".:;") + "?"
+        pairs.append({"q": question, "a": answer})
+        if len(pairs) >= max_pairs:
+            break
+    return pairs
+
+
+def _build_faqpage_json_from_content(content):
+    """Build FAQPage JSON-LD from FAQ cards if schema is missing."""
+    pairs = _extract_faq_pairs(content, max_pairs=4)
+    if len(pairs) < 2:
+        return None
+    schema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": item["q"],
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": item["a"],
+                },
+            }
+            for item in pairs
+        ],
+    }
+    return json.dumps(schema, ensure_ascii=False, indent=2)
 
 def _ensure_schema_in_html_block(faq_html):
     """Strip JSON-LD from visible FAQ and put it in a single wp:html block so it never displays as text."""
@@ -296,12 +374,15 @@ def _parse_article_output(raw_text):
         content_match = re.search(r'---CONTENT_START---(.*?)---CONTENT_END---', raw_text, re.DOTALL)
         content = content_match.group(1).strip() if content_match else ""
 
-        # ── Post-process: ensure FAQ schema is in <script> tags, not raw text ──
-        # 1) Extract raw JSON-LD schema from content (model sometimes dumps it as text)
+        # Post-process: ensure FAQ schema is in <script> tags, not raw text.
+        # 1) Extract FAQPage JSON-LD from content if present.
         schema_json = _extract_faqpage_json(content)
         # 2) Strip raw schema + any mis-placed <script> schema from body
         content = _strip_faq_and_schema_from_content(content)
-        # 3) Re-attach the schema properly wrapped in a wp:html + script block
+        # 3) If FAQ cards exist but schema is missing, synthesize schema.
+        if not schema_json:
+            schema_json = _build_faqpage_json_from_content(content)
+        # 4) Re-attach schema wrapped in a wp:html + script block
         if schema_json:
             schema_block = (
                 '<!-- wp:html -->\n'
@@ -363,3 +444,5 @@ if __name__ == "__main__":
         print(f"WORDS: {article['word_count']}")
         print(f"SOURCES: {', '.join(article['sources_used'])}")
         print(f"\nCONTENT PREVIEW:\n{article['content'][:500]}...")
+
+
