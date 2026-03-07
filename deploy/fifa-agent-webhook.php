@@ -89,16 +89,17 @@ if (!empty($data['action']) && $data['action'] === 'publish_draft' && isset($dat
     exit;
 }
 
-$title       = isset($data['title']) ? sanitize_text_field($data['title']) : 'Untitled';
-$content     = isset($data['content']) ? $data['content'] : '';
-$excerpt     = isset($data['excerpt']) ? sanitize_textarea_field($data['excerpt']) : '';
-$slug        = isset($data['slug']) ? sanitize_title($data['slug']) : '';
-$status      = isset($data['status']) && in_array($data['status'], ['draft', 'pending', 'publish'], true) ? $data['status'] : 'draft';
-$tags        = isset($data['tags']) && is_array($data['tags']) ? $data['tags'] : [];
-$category    = isset($data['category']) ? sanitize_text_field($data['category']) : 'Blog';
-$rank_title  = isset($data['rank_math_title']) ? sanitize_text_field($data['rank_math_title']) : $title;
-$rank_desc   = isset($data['rank_math_description']) ? sanitize_textarea_field($data['rank_math_description']) : $excerpt;
-$rank_kw     = isset($data['rank_math_focus_keyword']) ? sanitize_text_field($data['rank_math_focus_keyword']) : '';
+$title = isset($data['title']) ? sanitize_text_field($data['title']) : 'Untitled';
+$content = isset($data['content']) ? $data['content'] : '';
+$excerpt = isset($data['excerpt']) ? sanitize_textarea_field($data['excerpt']) : '';
+$slug = isset($data['slug']) ? sanitize_title($data['slug']) : '';
+$status = isset($data['status']) && in_array($data['status'], ['draft', 'pending', 'publish'], true) ? $data['status'] : 'draft';
+$tags = isset($data['tags']) && is_array($data['tags']) ? $data['tags'] : [];
+$category = isset($data['category']) ? sanitize_text_field($data['category']) : 'Blog';
+$rank_title = isset($data['rank_math_title']) ? sanitize_text_field($data['rank_math_title']) : $title;
+$rank_desc = isset($data['rank_math_description']) ? sanitize_textarea_field($data['rank_math_description']) : $excerpt;
+$rank_kw = isset($data['rank_math_focus_keyword']) ? sanitize_text_field($data['rank_math_focus_keyword']) : '';
+$faq_schema = isset($data['faq_schema']) ? $data['faq_schema'] : '';
 
 // Create or get category
 $cat_id = 0;
@@ -116,7 +117,8 @@ if (!empty($terms)) {
 $tag_ids = [];
 foreach ($tags as $tag_name) {
     $tag_name = sanitize_text_field($tag_name);
-    if ($tag_name === '') continue;
+    if ($tag_name === '')
+        continue;
     $t = get_term_by('name', $tag_name, 'post_tag');
     if ($t) {
         $tag_ids[] = (int) $t->term_id;
@@ -135,7 +137,8 @@ if (!empty($data['featured_image_base64']) && !empty($data['featured_image_filen
     $mime = 'image/webp';
     if (preg_match('/\.(jpe?g|png)$/i', $filename)) {
         $mime = 'image/jpeg';
-        if (preg_match('/\.png$/i', $filename)) $mime = 'image/png';
+        if (preg_match('/\.png$/i', $filename))
+            $mime = 'image/png';
     }
     $bytes = base64_decode($data['featured_image_base64'], true);
     if ($bytes !== false && strlen($bytes) > 0) {
@@ -144,16 +147,16 @@ if (!empty($data['featured_image_base64']) && !empty($data['featured_image_filen
             $file_path = $upload['file'];
             $attachment = [
                 'post_mime_type' => $upload['type'],
-                'post_title'     => $title,
-                'post_content'   => '',
-                'post_status'    => 'inherit',
+                'post_title' => $title,
+                'post_content' => '',
+                'post_status' => 'inherit',
             ];
             $attach_id = wp_insert_attachment($attachment, $file_path);
             if (!is_wp_error($attach_id)) {
                 require_once ABSPATH . 'wp-admin/includes/image.php';
                 wp_generate_attachment_metadata($attach_id, $file_path);
                 $featured_id = (int) $attach_id;
-                
+
                 // Set the alt text for the featured image
                 $alt_text = isset($data['featured_image_alt']) ? sanitize_text_field($data['featured_image_alt']) : $title;
                 update_post_meta($featured_id, '_wp_attachment_image_alt', $alt_text);
@@ -163,13 +166,13 @@ if (!empty($data['featured_image_base64']) && !empty($data['featured_image_filen
 }
 
 $post_arr = [
-    'post_title'   => $title,
+    'post_title' => $title,
     'post_content' => $content,
     'post_excerpt' => $excerpt,
-    'post_name'    => $slug,
-    'post_status'  => $status,
-    'post_type'    => 'post',
-    'post_author'  => $webhook_author_id,
+    'post_name' => $slug,
+    'post_status' => $status,
+    'post_type' => 'post',
+    'post_author' => $webhook_author_id,
     'comment_status' => 'open',
 ];
 $post_id = wp_insert_post($post_arr, true);
@@ -194,10 +197,17 @@ update_post_meta($post_id, 'rank_math_title', $rank_title);
 update_post_meta($post_id, 'rank_math_description', $rank_desc);
 update_post_meta($post_id, 'rank_math_focus_keyword', $rank_kw);
 
+// FAQ Schema meta (for Ultimate Event Schema Injector plugin)
+if (!empty($faq_schema)) {
+    // The plugin adds <script> tags automatically, so we need to strip them if they were included
+    $clean_schema = preg_replace('#<script(.*?)>|</script>#is', '', $faq_schema);
+    update_post_meta($post_id, '_ssi_schema_faq', wp_slash(trim($clean_schema)));
+}
+
 $post_url = get_permalink($post_id);
 echo json_encode([
-    'success'  => true,
-    'post_id'  => (int) $post_id,
+    'success' => true,
+    'post_id' => (int) $post_id,
     'post_url' => $post_url,
-    'status'   => $status,
+    'status' => $status,
 ]);

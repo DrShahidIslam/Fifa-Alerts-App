@@ -199,6 +199,7 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
         "rank_math_title": article.get("title", ""),
         "rank_math_description": article.get("meta_description", ""),
         "rank_math_focus_keyword": article.get("matched_keyword", "") or (article.get("tags") or [""])[0],
+        "faq_schema": article.get("faq_schema", ""),
     }
     if featured_image_path and os.path.exists(featured_image_path):
         with open(featured_image_path, "rb") as f:
@@ -404,6 +405,13 @@ def _set_rankmath_meta(post_id, article):
             "rank_math_robots": ["index", "follow"],
         }
     }
+
+    faq_schema = article.get("faq_schema", "")
+    if faq_schema:
+        # Strip script tags from the schema since the Ultimate Event Schema Injector adds them natively
+        import re
+        clean_schema = re.sub(r'<script.*?>|</script>', '', faq_schema, flags=re.IGNORECASE | re.DOTALL).strip()
+        rankmath_meta["meta"]["_ssi_schema_faq"] = clean_schema
 
     try:
         # PATCH is the correct method for partial post update (meta only).

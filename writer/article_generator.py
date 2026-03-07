@@ -421,16 +421,10 @@ def _parse_article_output(raw_text):
         # 3) If FAQ cards exist but schema is missing, synthesize schema.
         if not schema_json:
             schema_json = _build_faqpage_json_from_content(content)
-        # 4) Re-attach schema wrapped in a wp:html + script block
+        # 4) Store schema in a separate field instead of appending to content.
+        # This prevents it from displaying as text on the frontend.
         if schema_json:
-            schema_block = (
-                '<!-- wp:html -->\n'
-                '<script type="application/ld+json">\n'
-                + schema_json +
-                '\n</script>\n'
-                '<!-- /wp:html -->'
-            )
-            content = content.strip() + "\n\n" + schema_block
+            result["faq_schema"] = schema_json
 
         # 5) Clean out hallucinated internal URLs
         content = _clean_hallucinated_links(content)
