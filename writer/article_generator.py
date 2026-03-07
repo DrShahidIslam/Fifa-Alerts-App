@@ -15,7 +15,17 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import config
 from writer.source_fetcher import fetch_multiple_sources
-from writer.seo_prompt import build_article_prompt, get_verified_internal_links
+from writer.seo_prompt import (
+    ARTICLE_WRAPPER_STYLE,
+    CTA_BUTTON_STYLE,
+    CTA_CONTAINER_STYLE,
+    FAQ_CARD_STYLE,
+    IMPORTANT_UPDATE_STYLE,
+    KEY_FACTS_STYLE,
+    build_article_prompt,
+    get_verified_internal_links,
+    _normalize_internal_url,
+)
 from gemini_client import generate_content_with_fallback
 
 logger = logging.getLogger(__name__)
@@ -336,6 +346,30 @@ def _wrap_content_with_padding(content):
     )
 
 
+def _normalize_generated_ui_blocks(content):
+    """Apply stable, responsive inline styles to generated callouts, CTA, and FAQ cards."""
+    if not content:
+        return content
+
+    replacements = {
+        "padding:1.5rem 2rem 2.5rem 2rem": ARTICLE_WRAPPER_STYLE,
+        "border-left: 4px solid #e94560;padding: 1rem 1.25rem;margin: 1.5rem 0;border-radius: 0 8px 8px 0;background-color:#f9f9f9;color:#000000;": KEY_FACTS_STYLE,
+        "padding: 1rem 1.25rem;margin: 1.5rem 0;border: 1px solid #ffc107;border-radius: 8px;background-color:#fffdf5;color:#000000;": IMPORTANT_UPDATE_STYLE,
+        "display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;": CTA_CONTAINER_STYLE,
+        "margin: 1.5rem 0;padding: 1rem;background-color:#f9f9f9;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;": FAQ_CARD_STYLE,
+    }
+    for old_style, new_style in replacements.items():
+        content = content.replace(old_style, new_style)
+
+    content = re.sub(
+        r'(<a[^>]*href=["\']https://fifa-worldcup26\.com/?["\'][^>]*style=["\'])[^"\']*(["\'])',
+        lambda match: f"{match.group(1)}{CTA_BUTTON_STYLE}{match.group(2)}",
+        content,
+        flags=re.IGNORECASE,
+    )
+    return content
+
+
 def _clean_hallucinated_links(content):
     """
     Find all internal links in the content, and if they do not exist
@@ -346,7 +380,7 @@ def _clean_hallucinated_links(content):
         return content
 
     verified = get_verified_internal_links()
-    valid_urls = [item["url"] for item in verified]
+    valid_urls = {_normalize_internal_url(item["url"]) for item in verified}
 
     def _replace_link(match):
         href = match.group(1)
@@ -357,16 +391,18 @@ def _clean_hallucinated_links(content):
         if "fifa-worldcup26.com" not in href_clean and not href_clean.startswith("/"):
             return match.group(0)
 
-        # Build absolute if relative
-        if href_clean.startswith("/"):
-            href_clean = f"https://fifa-worldcup26.com{href_clean}"
-
-        # If the generated URL isn't in our valid list, strip the link tag
-        if href_clean not in valid_urls:
-            logger.warning(f"Stripped hallucinated link: {href_clean}")
+        href_clean = _normalize_internal_url(href_clean)
+        if not href_clean or href_clean not in valid_urls:
+            logger.warning(f"Stripped hallucinated link: {href}")
             return anchor_text
 
-        return match.group(0)
+        return re.sub(
+            r'href=["\'][^"\']+["\']',
+            f'href="{href_clean}"',
+            match.group(0),
+            count=1,
+            flags=re.IGNORECASE,
+        )
 
     cleaned = re.sub(
         r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
@@ -428,6 +464,7 @@ def _parse_article_output(raw_text):
 
         # 5) Clean out hallucinated internal URLs
         content = _clean_hallucinated_links(content)
+        content = _normalize_generated_ui_blocks(content)
 
         result["content"] = content
         result["full_content"] = content

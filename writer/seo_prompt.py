@@ -11,7 +11,7 @@ import os
 import re
 import time
 import xml.etree.ElementTree as ET
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 import requests
 
@@ -69,6 +69,13 @@ _INTERNAL_LINKS_CACHE = {"loaded_at": 0, "links": None}
 _INTERNAL_LINKS_CACHE_TTL_SECONDS = 6 * 60 * 60
 _INTERNAL_LINKS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "internal_links_cache.json")
 
+ARTICLE_WRAPPER_STYLE = "padding:clamp(1rem,3vw,1.5rem) clamp(1rem,4vw,2rem) clamp(2rem,5vw,2.5rem);"
+KEY_FACTS_STYLE = "border-left:4px solid #e94560;padding:clamp(1rem,2.5vw,1.25rem);margin:1.5rem 0;border-radius:0 14px 14px 0;background-color:#f9f9f9;color:#000000;box-sizing:border-box;"
+IMPORTANT_UPDATE_STYLE = "padding:clamp(1rem,2.5vw,1.25rem);margin:1.5rem 0;border:1px solid #ffc107;border-radius:14px;background-color:#fffdf5;color:#000000;box-sizing:border-box;"
+CTA_CONTAINER_STYLE = "display:block !important;padding:clamp(1.25rem,4vw,2.25rem) !important;margin:2rem 0 !important;border-radius:20px !important;background:linear-gradient(135deg,#081225 0%,#0d2746 55%,#123b63 100%) !important;text-align:center !important;box-shadow:0 18px 40px rgba(0,0,0,0.28) !important;border:1px solid rgba(255,255,255,0.08) !important;border-left:5px solid #e94560 !important;box-sizing:border-box !important;overflow:hidden !important;"
+CTA_BUTTON_STYLE = "display:inline-flex;align-items:center;justify-content:center;width:100%;max-width:420px;min-height:56px;padding:1rem 1.5rem;border-radius:14px;background:#e94560;color:#ffffff;text-decoration:none;font-weight:700;font-size:clamp(1rem,2.4vw,1.125rem);line-height:1.3;box-sizing:border-box;"
+FAQ_CARD_STYLE = "margin:1rem 0;padding:clamp(1rem,2.4vw,1.35rem);background-color:#f9f9f9;border-radius:16px;border:1px solid #dddddd;overflow:hidden;color:#000000;box-sizing:border-box;"
+
 ARTICLE_STRUCTURE_VARIANTS = [
     {
         "id": "A",
@@ -122,12 +129,59 @@ def _slug_to_anchor(url):
     return pretty[:1].upper() + pretty[1:]
 
 
+def _normalize_internal_url(url):
+    """Canonicalize site URLs so comparisons do not fail on slash/query variants."""
+    if not url or not isinstance(url, str):
+        return ""
+
+    raw = url.strip()
+    if not raw:
+        return ""
+
+    if raw.startswith("/"):
+        raw = config.WP_URL.rstrip("/") + raw
+
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+
+    site = urlparse(config.WP_URL)
+    if parsed.netloc.lower() != site.netloc.lower():
+        return raw.rstrip("/")
+
+    path = re.sub(r"/{2,}", "/", parsed.path or "/")
+    if not path.endswith("/"):
+        path = f"{path}/"
+
+    normalized = parsed._replace(
+        scheme=site.scheme,
+        netloc=site.netloc,
+        path=path,
+        params="",
+        query="",
+        fragment="",
+    )
+    return urlunparse(normalized)
+
+
+def _dedupe_urls(urls):
+    unique = []
+    seen = set()
+    for url in urls:
+        normalized = _normalize_internal_url(url)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            unique.append(normalized)
+    return unique
+
+
 def _is_valid_internal_url(url):
-    if not url or "wp-content" in url or "wp-json" in url or "xmlrpc.php" in url:
+    normalized = _normalize_internal_url(url)
+    if not normalized or "wp-content" in normalized or "wp-json" in normalized or "xmlrpc.php" in normalized:
         return False
-    if any(x in url for x in ("/feed", "/tag/", "/author/", "/comments/", ".jpg", ".png", ".webp", ".svg", ".pdf")):
+    if any(x in normalized for x in ("/feed", "/tag/", "/author/", "/comments/", ".jpg", ".png", ".webp", ".svg", ".pdf")):
         return False
-    return url.startswith(config.WP_URL.rstrip("/") + "/")
+    return normalized.startswith(config.WP_URL.rstrip("/") + "/")
 
 
 def _extract_urls_from_sitemap_xml(xml_text):
@@ -178,7 +232,7 @@ def _fetch_dynamic_internal_links(max_links=40):
                 continue
             for loc in _extract_urls_from_sitemap_xml(r.text):
                 if _is_valid_internal_url(loc):
-                    discovered_urls.append(loc)
+                    discovered_urls.append(_normalize_internal_url(loc))
                 if len(discovered_urls) >= max_links:
                     break
             if len(discovered_urls) >= max_links:
@@ -186,13 +240,7 @@ def _fetch_dynamic_internal_links(max_links=40):
         except Exception:
             continue
 
-    unique = []
-    seen = set()
-    for u in discovered_urls:
-        if u not in seen:
-            seen.add(u)
-            unique.append(u)
-    return unique[:max_links]
+    return _dedupe_urls(discovered_urls)[:max_links]
 
 
 def _load_cached_dynamic_links():
@@ -202,9 +250,8 @@ def _load_cached_dynamic_links():
                 payload = json.load(f)
             if isinstance(payload, dict):
                 links = payload.get("links") or []
-                updated_at = float(payload.get("updated_at", 0))
-                if links and (time.time() - updated_at) < _INTERNAL_LINKS_CACHE_TTL_SECONDS:
-                    return [l for l in links if isinstance(l, str)]
+                if links:
+                    return _dedupe_urls([l for l in links if isinstance(l, str)])
     except Exception:
         pass
     return []
@@ -212,30 +259,30 @@ def _load_cached_dynamic_links():
 
 def _save_cached_dynamic_links(links):
     try:
-        payload = {"updated_at": time.time(), "links": links}
+        payload = {"updated_at": time.time(), "links": _dedupe_urls(links)}
         with open(_INTERNAL_LINKS_FILE, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
+            json.dump(payload, f, indent=2)
     except Exception:
         pass
 
 
 def append_to_dynamic_links_cache(url):
     """Append a newly published URL to the dynamic links cache so it can be used immediately."""
-    if not url or not _is_valid_internal_url(url):
+    normalized = _normalize_internal_url(url)
+    if not normalized or not _is_valid_internal_url(normalized):
         return
 
     links = _load_cached_dynamic_links()
-    if url not in links:
-        links.append(url)
+    if normalized not in links:
+        links.append(normalized)
         _save_cached_dynamic_links(links)
 
         # Update memoized cache if already loaded
         if _INTERNAL_LINKS_CACHE["links"] is not None:
-            anchor = _slug_to_anchor(url)
-            # Check if it doesn't already exist
-            existing = [item for item in _INTERNAL_LINKS_CACHE["links"] if item["url"] == url]
+            anchor = _slug_to_anchor(normalized)
+            existing = [item for item in _INTERNAL_LINKS_CACHE["links"] if item["url"] == normalized]
             if not existing:
-                _INTERNAL_LINKS_CACHE["links"].append({"url": url, "anchor": anchor})
+                _INTERNAL_LINKS_CACHE["links"].append({"url": normalized, "anchor": anchor})
 
 
 def get_verified_internal_links():
@@ -248,7 +295,7 @@ def get_verified_internal_links():
     seen_urls = set()
 
     for info in INTERNAL_LINKS.values():
-        url = info.get("url", "").strip()
+        url = _normalize_internal_url(info.get("url", "").strip())
         anchor = info.get("anchor", "").strip()
         if not url or not anchor:
             continue
@@ -257,9 +304,17 @@ def get_verified_internal_links():
             merged.append({"url": url, "anchor": anchor})
 
     dynamic = _load_cached_dynamic_links()
-    if not dynamic:
-        dynamic = _fetch_dynamic_internal_links(max_links=60)
-        if dynamic:
+    file_age_seconds = 0
+    try:
+        if os.path.exists(_INTERNAL_LINKS_FILE):
+            file_age_seconds = time.time() - os.path.getmtime(_INTERNAL_LINKS_FILE)
+    except OSError:
+        pass
+
+    if not dynamic or file_age_seconds > _INTERNAL_LINKS_CACHE_TTL_SECONDS:
+        fetched = _fetch_dynamic_internal_links(max_links=60)
+        if fetched:
+            dynamic = _dedupe_urls(dynamic + fetched)
             _save_cached_dynamic_links(dynamic)
 
     for url in dynamic:
@@ -301,9 +356,18 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
     variant = _select_article_variant(topic_title, matched_keyword or topic_title)
 
     verified_links = get_verified_internal_links()
+    static_urls = {
+        _normalize_internal_url(info["url"])
+        for info in INTERNAL_LINKS.values()
+        if info.get("url")
+    }
+    static_links = [item for item in verified_links if item["url"] in static_urls]
+    dynamic_links = [item for item in verified_links if item["url"] not in static_urls]
+    link_budget = max(0, 120 - len(static_links))
+    selected_links = static_links + dynamic_links[-link_budget:]
     links_suggestion = "\n".join([
         f"  - [{item['anchor']}]({item['url']})"
-        for item in verified_links[:80]
+        for item in selected_links
     ])
 
     prompt = f"""You are an expert sports journalist and master of Semantic Search, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization) for fifa-worldcup26.com.
@@ -339,17 +403,19 @@ RULES:
 VISUAL DESIGN LOCK (NON-NEGOTIABLE):
 - Keep the exact same visual style system for every article: same padding, colors, border styles, and CTA look.
 - Use this exact wrapper and style attributes:
-  <div class="wp-block-group" style="padding:1.5rem 2rem 2.5rem 2rem"> ... </div>
+  <div class="wp-block-group" style="{ARTICLE_WRAPPER_STYLE}"> ... </div>
 - Include one Key Facts style callout using this exact style string:
-  border-left: 4px solid #e94560;padding: 1rem 1.25rem;margin: 1.5rem 0;border-radius: 0 8px 8px 0;background-color:#f9f9f9;color:#000000;
+  {KEY_FACTS_STYLE}
 - Include one Important Update style callout using this exact style string:
-  padding: 1rem 1.25rem;margin: 1.5rem 0;border: 1px solid #ffc107;border-radius: 8px;background-color:#fffdf5;color:#000000;
+  {IMPORTANT_UPDATE_STYLE}
 - Include this exact CTA block style and button style:
-  display:block !important; padding:2rem !important; margin:2rem 0 !important; border-radius:12px !important; background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460) !important; text-align:center !important; box-shadow:0 10px 20px rgba(0,0,0,0.15) !important; border-left:5px solid #e94560 !important;
+  CTA container: {CTA_CONTAINER_STYLE}
+  CTA button: {CTA_BUTTON_STYLE}
   CTA button must link to https://fifa-worldcup26.com/ and keep the same button styling.
 - Include FAQ cards using this same style skeleton:
-  margin: 1.5rem 0;padding: 1rem;background-color:#f9f9f9;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;
+  {FAQ_CARD_STYLE}
 - CRITICAL FIX FOR DARK THEME: The main article text MUST REMAIN UNSTYLED entirely so the website's dark theme forces it to white. However, since the Key Facts callout, Important Update callout, and FAQ cards use LIGHT background colors, you MUST explicitly add style="color:#000000;" to EVERY <p>, <ul>, <li>, and <h[1-6]> tag INSIDE those specific boxes ONLY. NEVER apply black text styling to normal paragraphs outside of those boxes!
+- CTA TEXT COLOR RULE: Inside the CTA box, explicitly set the CTA heading and supporting paragraph text to color:#ffffff;, keep them centered, and keep the inner text wrapper at max-width:40rem;margin:0 auto; so it looks balanced on desktop and mobile.
 
 STRUCTURE VARIATION (MANDATORY):
 - Use this variant for this article.
