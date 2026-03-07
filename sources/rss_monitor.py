@@ -37,6 +37,25 @@ def _hash_story(title, url):
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def _derive_feed_keyword(title, summary=""):
+    """Create a human keyword for football-only feeds instead of using an internal label."""
+    combined_text = f"{title} {summary}".strip()
+    is_match, matched_keyword = _matches_keywords(combined_text)
+    if is_match and matched_keyword:
+        return matched_keyword
+
+    cleaned = re.sub(r"<[^>]+>", " ", title or summary or "")
+    cleaned = re.sub(r"^[^:]{1,30}:\s*", "", cleaned).strip()
+    words = re.findall(r"[A-Za-z0-9']+", cleaned)
+    stop_words = {"the", "a", "an", "and", "or", "with", "from", "after", "before", "today", "live", "report"}
+    parts = [w for w in words if len(w) > 2 and w.lower() not in stop_words]
+    if len(parts) >= 4:
+        return " ".join(parts[:4])
+    if parts:
+        return " ".join(parts[:3])
+    return "football news"
+
+
 def fetch_rss_stories():
     """
     Fetch stories from all configured RSS feeds.
@@ -67,7 +86,7 @@ def fetch_rss_stories():
                 if is_football_feed:
                     # Accept all stories from football-only feeds
                     is_match = True
-                    matched_keyword = "general_football"
+                    matched_keyword = _derive_feed_keyword(title, summary)
                 else:
                     # Check if this story matches keywords
                     combined_text = f"{title} {summary}"

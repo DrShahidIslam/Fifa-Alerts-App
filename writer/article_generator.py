@@ -93,6 +93,35 @@ def _contains_keyword(text, keyword):
     return bool(keyword and text and keyword.lower() in text.lower())
 
 
+def _clean_topic_label(value):
+    value = _normalize_whitespace((value or "").replace("_", " "))
+    value = re.sub(r"^(general football|football|soccer)\s*[:\-]\s*", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\s*[|:,-]+\s*$", "", value).strip()
+    return value
+
+
+def _derive_focus_keyword(primary_keyword, topic_title):
+    keyword = _clean_topic_label(primary_keyword)
+    generic_terms = {"general football", "football", "soccer", "sports", "general"}
+    if keyword and keyword.lower() not in generic_terms and len(keyword) >= 4:
+        return keyword
+
+    title = _clean_topic_label(topic_title)
+    if not title:
+        return keyword or "football news"
+
+    if ":" in title:
+        title = title.split(":", 1)[1].strip()
+
+    title = re.split(r"[|]", title, maxsplit=1)[0].strip()
+    title = re.split(r"\s+and\s+|\s+vs\.?\s+|\s+v\s+", title, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+    title = re.sub(r"\s*&\s*$", "", title).strip()
+    words = title.split()
+    if len(words) > 5:
+        title = " ".join(words[:5])
+    return title or keyword or "football news"
+
+
 def _sanitize_slug(value):
     slug = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
     slug = re.sub(r"-{2,}", "-", slug)
@@ -123,7 +152,7 @@ def _ensure_intro_hook(content, primary_keyword, topic_title):
         return content
 
     hook = (
-        f"<p>{primary_keyword} is shaping the latest World Cup 2026 conversation, and the key developments matter immediately for fans, teams, and the tournament outlook.</p>"
+        f"<p>{primary_keyword} is the key football story right now, with immediate implications for fans, teams, and the wider tournament picture.</p>"
     )
 
     first_paragraph = re.search(r"<p[^>]*>(.*?)</p>", content, re.IGNORECASE | re.DOTALL)
@@ -141,13 +170,15 @@ def _ensure_intro_hook(content, primary_keyword, topic_title):
 
 
 def _apply_seo_guards(article, primary_keyword, topic_title):
-    primary_keyword = _normalize_whitespace(primary_keyword or topic_title)
+    primary_keyword = _derive_focus_keyword(primary_keyword, topic_title)
     if not primary_keyword:
         return article
 
     article["focus_keyword"] = primary_keyword
 
-    title = _normalize_whitespace(article.get("title") or topic_title)
+    title = _clean_topic_label(article.get("title") or topic_title)
+    if not title or title.lower() in {"general football", "football", "soccer"} or "_" in title:
+        title = _clean_topic_label(topic_title) or primary_keyword
     if not _contains_keyword(title, primary_keyword):
         title = f"{primary_keyword}: {title}" if title else primary_keyword
     article["title"] = _trim_to_limit(title, 60)
