@@ -205,9 +205,9 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
         "status": status or config.WP_DEFAULT_STATUS,
         "tags": article.get("tags", []),
         "category": article.get("category", config.WP_DEFAULT_CATEGORY),
-        "rank_math_title": article.get("title", ""),
+        "rank_math_title": article.get("seo_title", article.get("title", "")),
         "rank_math_description": article.get("meta_description", ""),
-        "rank_math_focus_keyword": article.get("matched_keyword", "") or (article.get("tags") or [""])[0],
+        "rank_math_focus_keyword": article.get("matched_keyword", "") or article.get("focus_keyword", "") or (article.get("tags") or [""])[0] or article.get("title", ""),
         "faq_schema": article.get("faq_schema", ""),
     }
     if featured_image_path and os.path.exists(featured_image_path):
@@ -400,15 +400,17 @@ def _set_rankmath_meta(post_id, article):
     Set RankMath SEO metadata on a post.
     Uses the WordPress REST API custom fields that RankMath often looks for.
     """
-    focus_kw = article.get("matched_keyword", "")
+    focus_kw = article.get("matched_keyword", "") or article.get("focus_keyword", "")
     if not focus_kw and article.get("tags"):
         focus_kw = article["tags"][0]
+    if not focus_kw:
+        focus_kw = article.get("title", "")
 
     # RankMath natively reads these meta keys if the WP REST API exposes them.
     # We will try both the nested 'meta' approach and the flat 'meta' approach.
     rankmath_meta = {
         "meta": {
-            "rank_math_title": article.get("title", ""),
+            "rank_math_title": article.get("seo_title", article.get("title", "")),
             "rank_math_description": article.get("meta_description", ""),
             "rank_math_focus_keyword": focus_kw,
             "rank_math_robots": ["index", "follow"],

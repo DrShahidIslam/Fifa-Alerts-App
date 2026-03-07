@@ -74,6 +74,99 @@ def _search_news_for_trend(keyword):
     return urls
 
 
+def _normalize_whitespace(value):
+    return re.sub(r"\s+", " ", (value or "")).strip()
+
+
+def _trim_to_limit(text, limit):
+    text = _normalize_whitespace(text)
+    if len(text) <= limit:
+        return text
+    trimmed = text[: limit - 1].rstrip(" ,:;.-")
+    cut = trimmed.rfind(" ")
+    if cut > int(limit * 0.6):
+        trimmed = trimmed[:cut]
+    return trimmed.rstrip(" ,:;.-")
+
+
+def _contains_keyword(text, keyword):
+    return bool(keyword and text and keyword.lower() in text.lower())
+
+
+def _sanitize_slug(value):
+    slug = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    slug = re.sub(r"-{2,}", "-", slug)
+    return slug[:70].strip("-")
+
+
+def _build_meta_title(title, primary_keyword):
+    seo_title = _normalize_whitespace(title)
+    if not _contains_keyword(seo_title, primary_keyword):
+        seo_title = f"{primary_keyword}: {seo_title}" if seo_title else primary_keyword
+    return _trim_to_limit(seo_title, 60)
+
+
+def _build_meta_description(meta_description, primary_keyword):
+    meta = _normalize_whitespace(meta_description)
+    if not meta:
+        meta = f"Discover {primary_keyword} and what it means for fans, teams, and the World Cup 2026 picture right now."
+    elif not _contains_keyword(meta, primary_keyword):
+        meta = f"Discover {primary_keyword}: {meta}"
+    meta = _trim_to_limit(meta, 155)
+    if len(meta) < 145:
+        meta = _trim_to_limit(f"{meta} Latest impact, key facts, and what to watch next.", 155)
+    return meta
+
+
+def _ensure_intro_hook(content, primary_keyword, topic_title):
+    if not content:
+        return content
+
+    hook = (
+        f"<p>{primary_keyword} is shaping the latest World Cup 2026 conversation, and the key developments matter immediately for fans, teams, and the tournament outlook.</p>"
+    )
+
+    first_paragraph = re.search(r"<p[^>]*>(.*?)</p>", content, re.IGNORECASE | re.DOTALL)
+    if not first_paragraph:
+        return hook + content
+
+    first_text = html.unescape(re.sub(r"<[^>]+>", "", first_paragraph.group(1))).strip()
+    is_too_short = len(first_text.split()) < 18
+    lacks_keyword = not _contains_keyword(first_text, primary_keyword)
+    weak_open = first_text.lower().startswith(("in this article", "this article", "fans are asking"))
+
+    if is_too_short or lacks_keyword or weak_open:
+        return content[:first_paragraph.start()] + hook + content[first_paragraph.start():]
+    return content
+
+
+def _apply_seo_guards(article, primary_keyword, topic_title):
+    primary_keyword = _normalize_whitespace(primary_keyword or topic_title)
+    if not primary_keyword:
+        return article
+
+    article["focus_keyword"] = primary_keyword
+
+    title = _normalize_whitespace(article.get("title") or topic_title)
+    if not _contains_keyword(title, primary_keyword):
+        title = f"{primary_keyword}: {title}" if title else primary_keyword
+    article["title"] = _trim_to_limit(title, 60)
+    article["seo_title"] = _build_meta_title(article["title"], primary_keyword)
+
+    article["meta_description"] = _build_meta_description(article.get("meta_description"), primary_keyword)
+
+    slug = _sanitize_slug(article.get("slug"))
+    if not slug or primary_keyword.lower().replace(" ", "-") not in slug:
+        slug = _sanitize_slug(primary_keyword)
+    article["slug"] = slug
+
+    content = article.get("content", "")
+    content = _ensure_intro_hook(content, primary_keyword, topic_title)
+    article["content"] = content
+    article["full_content"] = content
+    return article
+
+
 def generate_article(topic, source_urls=None):
     """
     Generate a complete SEO-optimized article for a trending topic.
@@ -159,6 +252,7 @@ def generate_article(topic, source_urls=None):
     article = _parse_article_output(raw_output)
 
     if article:
+        article = _apply_seo_guards(article, topic.get("matched_keyword", ""), topic.get("topic", ""))
         article["sources_used"] = [s.get("source_domain", "") for s in source_texts]
         article["word_count"] = len(article.get("content", "").split())
         logger.info(f"  Article generated: '{article['title']}' ({article['word_count']} words)")

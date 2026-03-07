@@ -377,23 +377,28 @@ TASK: Write a complete, publish-ready article about the following trending topic
 
 TRENDING TOPIC: {topic_title}
 PRIMARY KEYWORD: {matched_keyword or topic_title}
+FOCUS KEYWORD: {matched_keyword or topic_title}
 
 --- SOURCE MATERIAL (use ONLY these facts, do NOT fabricate) ---
 {sources_block}
 
 --- ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ---
 
-1) KEYWORD DENSITY: Ensure primary keyword density is strictly below 0.8 percent in paragraph text. Avoid stuffing.
-2) AEO and GEO: Use direct answers, clear entity linking, and highly parseable factual sentences.
-3) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
-4) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
+1) FOCUS KEYWORD: Treat the PRIMARY KEYWORD as the article's focus keyword for SEO, AEO, GEO, and RankMath.
+2) TITLE SEO: The exact focus keyword must appear in the title once, preferably near the front, while staying natural and under 60 characters.
+3) META SEO: The meta description must contain the focus keyword once, stay between 145 and 155 characters, and feel clickable with a clear benefit or curiosity gap.
+4) INTRO HOOK: The first paragraph must open with a strong hook, answer the main search intent immediately, and explain why the update matters within 2 short sentences.
+5) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
+6) AEO and GEO: Use direct answers, entity-rich language, question-matching phrasing, and highly parseable factual sentences.
+7) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
+8) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: SEO-optimized, under 60 chars.
-2. META_DESCRIPTION: 150-155 chars, starts with an action verb.
-3. SLUG: keyword-rich, lowercase, hyphens only.
-4. ARTICLE BODY: Magazine-quality HTML.
+1. TITLE: SEO-optimized, under 60 chars, and includes the exact focus keyword.
+2. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword, and uses a compelling action-oriented hook.
+3. SLUG: keyword-rich, lowercase, hyphens only, and based on the focus keyword.
+4. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
 5. FAQ: 3-4 schema-ready questions.
 
 RULES:
@@ -424,6 +429,8 @@ STRUCTURE VARIATION (MANDATORY):
 - Variant Guide: {variant['instructions']}
 - Keep all mandatory blocks: key facts callout, important update callout, CTA block, FAQ plus JSON-LD.
 - Use 4-6 topical sections with unique H2 headings based on the story.
+- At least one H2 must contain the focus keyword or a very close natural variation.
+- The opening 120 words must directly satisfy the likely search query before expanding into analysis.
 - Do not use generic headings such as "Next Section" or "Another Section".
 
 INTERNAL LINKING RULES (STRICT):
@@ -437,6 +444,8 @@ Allowed genuine internal links (copy URL and anchor exactly):
 EDITORIAL GUIDELINES:
 - Tone: authoritative but conversational.
 - Word count: 800-1500 words.
+- Prioritize search intent coverage: what happened, why it matters, who is affected, and what comes next.
+- Use a strong opening hook and a clean scannable structure with short sections, lists only where useful, and conclusion-led takeaways.
 - Never fabricate facts, quotes, scores, or dates.
 - If sources conflict, mention both perspectives.
 - This is an unofficial fan guide. Never claim to represent FIFA.

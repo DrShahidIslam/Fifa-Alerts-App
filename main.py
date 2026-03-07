@@ -448,7 +448,7 @@ def _handle_write_article(topic_hash=None):
     try:
         article = generate_article(topic)
         if article:
-            article["matched_keyword"] = topic.get("matched_keyword", "")  # For RankMath focus keyword
+            article["matched_keyword"] = (topic.get("matched_keyword") or topic.get("topic", "")).strip()  # For RankMath focus keyword
             article["source_url"] = topic.get("top_url") or (topic.get("stories") or [{}])[0].get("url") or ""
             _pending_article = article
             send_article_preview(article)
