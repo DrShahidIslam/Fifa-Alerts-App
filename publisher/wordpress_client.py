@@ -64,10 +64,19 @@ def _validate_article_before_publish(article):
     ) >= 2
 
     if has_faq_heading or has_faq_like_items:
-        if "application/ld+json" not in content_lower:
+        # FAQ schema may live in the separate faq_schema field (set by
+        # article_generator) instead of being inline in the HTML content.
+        faq_schema = (article.get("faq_schema") or "").strip()
+        has_schema_in_content = "application/ld+json" in content_lower
+        has_schema_in_field = bool(faq_schema)
+
+        if not has_schema_in_content and not has_schema_in_field:
             errors.append("FAQ section found but JSON-LD script is missing")
-        elif "faqpage" not in content_lower:
-            errors.append("FAQ section found but FAQPage schema is missing")
+        else:
+            # Verify the schema actually references FAQPage
+            schema_text = (faq_schema + " " + content).lower()
+            if "faqpage" not in schema_text:
+                errors.append("FAQ section found but FAQPage schema is missing")
 
     return errors, warnings
 
