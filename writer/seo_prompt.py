@@ -349,7 +349,7 @@ VISUAL DESIGN LOCK (NON-NEGOTIABLE):
   CTA button must link to https://fifa-worldcup26.com/ and keep the same button styling.
 - Include FAQ cards using this same style skeleton:
   margin: 1.5rem 0;padding: 1rem;background-color:#f9f9f9;border-radius: 8px;border:1px solid #ddd;overflow: hidden;color:#000000;
-- CRITICAL: Since the site is darkly themed, you MUST ALSO add style="color:#000000;" directly to EVERY <p>, <ul>, <li>, and <h[1-6]> tag that you put inside the Key Facts callout, Important Update callout, and FAQ cards so they do not show up as invisible white text.
+- CRITICAL FIX FOR DARK THEME: The main article text MUST REMAIN UNSTYLED entirely so the website's dark theme forces it to white. However, since the Key Facts callout, Important Update callout, and FAQ cards use LIGHT background colors, you MUST explicitly add style="color:#000000;" to EVERY <p>, <ul>, <li>, and <h[1-6]> tag INSIDE those specific boxes ONLY. NEVER apply black text styling to normal paragraphs outside of those boxes!
 
 STRUCTURE VARIATION (MANDATORY):
 - Use this variant for this article.
