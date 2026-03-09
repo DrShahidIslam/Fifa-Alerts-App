@@ -128,10 +128,12 @@ def _sanitize_slug(value):
     return slug[:70].strip("-")
 
 
-def _build_meta_title(title, primary_keyword):
-    seo_title = _normalize_whitespace(title)
+def _build_meta_title(seo_title, primary_keyword, article_title=""):
+    seo_title = _normalize_whitespace(seo_title)
     if not _contains_keyword(seo_title, primary_keyword):
         seo_title = f"{primary_keyword}: {seo_title}" if seo_title else primary_keyword
+    if article_title and seo_title.lower() == _normalize_whitespace(article_title).lower():
+        seo_title = f"{primary_keyword}: impact and latest update"
     return _trim_to_limit(seo_title, 60)
 
 
@@ -169,6 +171,30 @@ def _ensure_intro_hook(content, primary_keyword, topic_title):
     return content
 
 
+def _ensure_value_add_paragraph(content, primary_keyword, topic_title):
+    if not content:
+        return content
+
+    if re.search(r"why this matters|why it matters|impact on|what this means", content, re.IGNORECASE):
+        return content
+
+    focus = _clean_topic_label(topic_title) or primary_keyword
+    impact_block = (
+        f"<h2>Why this matters</h2>"
+        f"<p>Beyond the headline, {focus} could shape fan expectations, selection decisions, and the wider World Cup 2026 conversation. "
+        f"The immediate effect will depend on how the story develops, but it already gives supporters and analysts a clearer signal about what to watch next.</p>"
+    )
+
+    paragraphs = list(re.finditer(r"<p[^>]*>.*?</p>", content, re.IGNORECASE | re.DOTALL))
+    if len(paragraphs) >= 2:
+        insert_at = paragraphs[1].end()
+        return content[:insert_at] + impact_block + content[insert_at:]
+    if paragraphs:
+        insert_at = paragraphs[0].end()
+        return content[:insert_at] + impact_block + content[insert_at:]
+    return impact_block + content
+
+
 def _apply_seo_guards(article, primary_keyword, topic_title):
     primary_keyword = _derive_focus_keyword(primary_keyword, topic_title)
     if not primary_keyword:
@@ -182,7 +208,8 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     if not _contains_keyword(title, primary_keyword):
         title = f"{primary_keyword}: {title}" if title else primary_keyword
     article["title"] = _trim_to_limit(title, 60)
-    article["seo_title"] = _build_meta_title(article["title"], primary_keyword)
+    seo_title = article.get("seo_title") or article["title"]
+    article["seo_title"] = _build_meta_title(seo_title, primary_keyword, article_title=article["title"])
 
     article["meta_description"] = _build_meta_description(article.get("meta_description"), primary_keyword)
 
@@ -193,6 +220,7 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
 
     content = article.get("content", "")
     content = _ensure_intro_hook(content, primary_keyword, topic_title)
+    content = _ensure_value_add_paragraph(content, primary_keyword, topic_title)
     article["content"] = content
     article["full_content"] = content
     return article
@@ -547,8 +575,12 @@ def _parse_article_output(raw_text):
         result = {}
 
         # Extract TITLE
-        title_match = re.search(r'TITLE:\s*(.+?)(?:\n|META_DESCRIPTION:)', raw_text, re.DOTALL)
+        title_match = re.search(r'TITLE:\s*(.+?)(?:\n|SEO_TITLE:)', raw_text, re.DOTALL)
         result["title"] = title_match.group(1).strip() if title_match else ""
+
+        # Extract SEO_TITLE
+        seo_title_match = re.search(r'SEO_TITLE:\s*(.+?)(?:\n|META_DESCRIPTION:)', raw_text, re.DOTALL)
+        result["seo_title"] = seo_title_match.group(1).strip() if seo_title_match else ""
 
         # Extract META_DESCRIPTION
         meta_match = re.search(r'META_DESCRIPTION:\s*(.+?)(?:\n|SLUG:)', raw_text, re.DOTALL)

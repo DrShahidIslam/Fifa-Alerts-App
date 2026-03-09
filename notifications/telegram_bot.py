@@ -123,6 +123,7 @@ def send_article_preview(article_data):
         article_data: dict with title, meta_description, content (first 500 chars), slug
     """
     title = article_data.get("title", "Untitled")
+    seo_title = article_data.get("seo_title", "")
     meta = article_data.get("meta_description", "")
     slug = article_data.get("slug", "")
     word_count = article_data.get("word_count", 0)
@@ -133,6 +134,7 @@ def send_article_preview(article_data):
         "━" * 30,
         "",
         f"Title: {title}",
+        f"SEO Title: {seo_title or title}",
         f"Slug: /{slug}",
         f"Meta: {meta}",
         f"Words: {word_count}",

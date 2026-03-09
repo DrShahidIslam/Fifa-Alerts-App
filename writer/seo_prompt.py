@@ -1,4 +1,4 @@
-﻿"""
+"""
 SEO Prompt Template - Master prompt used for Gemini article generation.
 Enforces SEO best practices, editorial style, and internal linking.
 All URLs below are real pages on fifa-worldcup26.com; do not add or invent others.
@@ -386,20 +386,23 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 
 1) FOCUS KEYWORD: Treat the PRIMARY KEYWORD as the article's focus keyword for SEO, AEO, GEO, and RankMath.
 2) TITLE SEO: The exact focus keyword must appear in the title once, preferably near the front, while staying natural and under 60 characters.
-3) META SEO: The meta description must contain the focus keyword once, stay between 145 and 155 characters, and feel clickable with a clear benefit or curiosity gap.
-4) INTRO HOOK: The first paragraph must open with a strong hook, answer the main search intent immediately, and explain why the update matters within 2 short sentences.
-5) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
-6) AEO and GEO: Use direct answers, entity-rich language, question-matching phrasing, and highly parseable factual sentences.
-7) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
-8) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
+3) SEO TITLE: Create a separate SEO meta title that is different from the visible article title. Both titles must contain the exact focus keyword naturally, but they must serve different purposes.
+4) META SEO: The meta description must contain the focus keyword once, stay between 145 and 155 characters, and feel clickable with a clear benefit or curiosity gap.
+5) INTRO HOOK: The first paragraph must open with a strong hook, answer the main search intent immediately, and explain why the update matters within 2 short sentences.
+6) VALUE-ADD ANALYSIS: Include one dedicated paragraph early in the article that goes beyond reporting. It must explain the likely impact of the news on fans, the team or player involved, upcoming matches, rankings, transfers, tactics, or the wider World Cup 2026 picture. This paragraph must be analytical, cautious, and original rather than a reworded summary.
+7) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
+8) AEO and GEO: Use direct answers, entity-rich language, question-matching phrasing, and highly parseable factual sentences.
+9) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
+10) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: SEO-optimized, under 60 chars, and includes the exact focus keyword.
-2. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword, and uses a compelling action-oriented hook.
-3. SLUG: keyword-rich, lowercase, hyphens only, and based on the focus keyword.
-4. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
-5. FAQ: 3-4 schema-ready questions.
+1. TITLE: Visible on-page headline. Natural, editorial, under 60 chars, and includes the exact focus keyword.
+2. SEO_TITLE: Separate meta title for search results. Must be different from TITLE, under 60 chars, and include the exact focus keyword.
+3. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword, and uses a compelling action-oriented hook.
+4. SLUG: keyword-rich, lowercase, hyphens only, and based on the focus keyword.
+5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
+6. FAQ: 3-4 schema-ready questions.
 
 RULES:
 - Do NOT output any <!-- wp:... --> comments.
@@ -431,6 +434,7 @@ STRUCTURE VARIATION (MANDATORY):
 - Use 4-6 topical sections with unique H2 headings based on the story.
 - At least one H2 must contain the focus keyword or a very close natural variation.
 - The opening 120 words must directly satisfy the likely search query before expanding into analysis.
+- Include a standalone "Why this matters" or equivalent analysis section within the first half of the article.
 - Do not use generic headings such as "Next Section" or "Another Section".
 
 INTERNAL LINKING RULES (STRICT):
@@ -454,6 +458,7 @@ OUTPUT FORMAT:
 Return your response in this exact structured format:
 
 TITLE: [your title]
+SEO_TITLE: [your separate seo title]
 META_DESCRIPTION: [your meta description]
 SLUG: [your-slug]
 TAGS: [tag1, tag2, tag3, ...]
