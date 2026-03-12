@@ -327,6 +327,55 @@ def get_verified_internal_links():
     return merged
 
 
+def _extract_entities_from_topic(topic_title, matched_keyword, source_texts=None):
+    """Extract known entities (players, teams, competitions) from topic data.
+
+    Returns a dict with lists: players, teams, competitions, and a combined
+    'primary_entity' string for use in intros and metas.
+    """
+    combined_text = f"{topic_title} {matched_keyword}".lower()
+    if source_texts:
+        for src in source_texts[:3]:
+            combined_text += f" {(src.get('title') or '')[:200]}".lower()
+
+    players = []
+    for kw in config.PLAYER_KEYWORDS:
+        if kw.lower() in combined_text and kw not in players:
+            players.append(kw)
+
+    teams = []
+    for kw in config.TEAM_KEYWORDS:
+        if kw.lower() in combined_text and kw not in teams:
+            teams.append(kw)
+
+    competitions = []
+    comp_terms = [
+        "world cup 2026", "world cup", "champions league", "europa league",
+        "premier league", "la liga", "bundesliga", "serie a", "ligue 1",
+        "nations league", "copa america", "afcon", "qualifiers",
+        "club world cup", "conference league",
+    ]
+    for comp in comp_terms:
+        if comp in combined_text and comp not in competitions:
+            competitions.append(comp)
+
+    # Determine the single most important entity for intro/meta use
+    primary_entity = ""
+    if players:
+        primary_entity = players[0].title()
+    elif teams:
+        primary_entity = teams[0].title()
+    elif competitions:
+        primary_entity = competitions[0].title()
+
+    return {
+        "players": [p.title() for p in players],
+        "teams": [t.title() for t in teams],
+        "competitions": [c.title() for c in competitions],
+        "primary_entity": primary_entity,
+    }
+
+
 def _select_article_variant(topic_title, matched_keyword):
     """Pick a deterministic structure variant by topic."""
     seed = f"{topic_title}|{matched_keyword}".encode("utf-8")
@@ -355,6 +404,19 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
 
     variant = _select_article_variant(topic_title, matched_keyword or topic_title)
 
+    # --- Entity extraction for prompt enrichment ---
+    entities = _extract_entities_from_topic(topic_title, matched_keyword or "", source_texts)
+    entity_block_lines = []
+    if entities["players"]:
+        entity_block_lines.append(f"Players: {', '.join(entities['players'])}")
+    if entities["teams"]:
+        entity_block_lines.append(f"Teams: {', '.join(entities['teams'])}")
+    if entities["competitions"]:
+        entity_block_lines.append(f"Competitions: {', '.join(entities['competitions'])}")
+    if entities["primary_entity"]:
+        entity_block_lines.append(f"Primary Entity (use prominently): {entities['primary_entity']}")
+    entity_block = "\n".join(entity_block_lines) if entity_block_lines else "No specific entities detected — derive entities from sources."
+
     verified_links = get_verified_internal_links()
     static_urls = {
         _normalize_internal_url(info["url"])
@@ -379,6 +441,9 @@ TRENDING TOPIC: {topic_title}
 PRIMARY KEYWORD: {matched_keyword or topic_title}
 FOCUS KEYWORD: {matched_keyword or topic_title}
 
+--- IDENTIFIED ENTITIES (emphasize these throughout the article) ---
+{entity_block}
+
 --- SOURCE MATERIAL (use ONLY these facts, do NOT fabricate) ---
 {sources_block}
 
@@ -387,19 +452,33 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 1) FOCUS KEYWORD: Treat the PRIMARY KEYWORD as the article's focus keyword for SEO, AEO, GEO, and RankMath.
 2) TITLE SEO: The exact focus keyword must appear in the title once, preferably near the front, while staying natural and under 60 characters.
 3) SEO TITLE: Create a separate SEO meta title that is different from the visible article title. Both titles must contain the exact focus keyword naturally, but they must serve different purposes.
-4) META SEO: The meta description must contain the focus keyword once, stay between 145 and 155 characters, and feel clickable with a clear benefit or curiosity gap.
-5) INTRO HOOK: The first paragraph must open with a strong hook, answer the main search intent immediately, and explain why the update matters within 2 short sentences.
-6) VALUE-ADD ANALYSIS: Include one dedicated paragraph early in the article that goes beyond reporting. It must explain the likely impact of the news on fans, the team or player involved, upcoming matches, rankings, transfers, tactics, or the wider World Cup 2026 picture. This paragraph must be analytical, cautious, and original rather than a reworded summary.
-7) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
-8) AEO and GEO: Use direct answers, entity-rich language, question-matching phrasing, and highly parseable factual sentences.
-9) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
-10) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
+4) META SEO: The meta description must contain the focus keyword once, name the primary entity (player, team, or event), stay between 145 and 155 characters, and use an action verb plus curiosity gap to invite clicks.
+5) FIRST PARAGRAPH — CRITICAL (this is the most important paragraph for user engagement and SEO):
+   a) Must be 25-45 words: enough to be substantive, short enough to be punchy.
+   b) Must directly answer the core search intent behind the topic in the very first sentence.
+   c) Must name the primary entity (specific player, team, or competition) within the first 12 words.
+   d) Must contain the focus keyword naturally.
+   e) BANNED openers: Never start with "In this article", "This article", "Fans are asking", "Let's", "Here's", "Today we", "Read on", "We explore", or any meta-commentary about the article itself. Start with the NEWS.
+   f) The second sentence must state WHY this matters or what changed.
+6) ENTITY-FIRST WRITING: Every section's opening sentence should lead with the most important entity name (person, team, or event) as the grammatical subject, not a vague pronoun or filler phrase.
+7) VALUE-ADD ANALYSIS: Include one dedicated paragraph early in the article that goes beyond reporting. It must explain the likely impact of the news on fans, the team or player involved, upcoming matches, rankings, transfers, tactics, or the wider World Cup 2026 picture. This paragraph must be analytical, cautious, and original rather than a reworded summary.
+8) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
+9) AEO OPTIMIZATION (Answer Engines like Google AI Overview, Perplexity, ChatGPT):
+   a) Write at least 3 sentences in the article that directly answer likely search questions (who, what, when, where, why, how) in a single, self-contained, factual sentence that an AI engine can quote verbatim.
+   b) Use question-matching phrasing: open at least 2 sentences with "Who", "When", "Why", or "How" to mirror natural queries.
+   c) Place the most direct answer within the first 150 words of the article.
+10) GEO OPTIMIZATION (Generative Engine Optimization):
+   a) Write with high information density: no filler sentences, every sentence must add a new fact or insight.
+   b) Use clear entity co-occurrence: mention related entities together (e.g., player + team + competition in the same sentence) to strengthen knowledge graph signals.
+   c) Include at least one "definitive statement" per section that states a verifiable fact clearly.
+11) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
+12) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
 
 --- ARTICLE STRUCTURE ---
 
 1. TITLE: Visible on-page headline. Natural, editorial, under 60 chars, and includes the exact focus keyword.
 2. SEO_TITLE: Separate meta title for search results. Must be different from TITLE, under 60 chars, and include the exact focus keyword.
-3. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword, and uses a compelling action-oriented hook.
+3. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword AND the primary entity name, and uses a compelling action-oriented hook.
 4. SLUG: keyword-rich, lowercase, hyphens only, and based on the focus keyword.
 5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
 6. FAQ: 3-4 schema-ready questions.

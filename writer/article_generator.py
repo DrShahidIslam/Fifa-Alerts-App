@@ -25,6 +25,7 @@ from writer.seo_prompt import (
     build_article_prompt,
     get_verified_internal_links,
     _normalize_internal_url,
+    _extract_entities_from_topic,
 )
 from gemini_client import generate_content_with_fallback
 
@@ -137,38 +138,82 @@ def _build_meta_title(seo_title, primary_keyword, article_title=""):
     return _trim_to_limit(seo_title, 60)
 
 
-def _build_meta_description(meta_description, primary_keyword):
+def _build_meta_description(meta_description, primary_keyword, primary_entity=""):
     meta = _normalize_whitespace(meta_description)
     if not meta:
-        meta = f"Discover {primary_keyword} and what it means for fans, teams, and the World Cup 2026 picture right now."
+        entity_fragment = f" for {primary_entity}" if primary_entity and primary_entity.lower() != primary_keyword.lower() else ""
+        meta = f"Get the latest on {primary_keyword}{entity_fragment}: confirmed facts, impact analysis, and what comes next."
     elif not _contains_keyword(meta, primary_keyword):
-        meta = f"Discover {primary_keyword}: {meta}"
+        meta = f"{primary_keyword}: {meta}"
+    # Ensure entity presence for AEO
+    if primary_entity and not _contains_keyword(meta, primary_entity):
+        meta = meta.rstrip(".! ") + f" involving {primary_entity}."
     meta = _trim_to_limit(meta, 155)
     if len(meta) < 145:
-        meta = _trim_to_limit(f"{meta} Latest impact, key facts, and what to watch next.", 155)
+        meta = _trim_to_limit(f"{meta} Key facts, timeline, and what to watch next.", 155)
     return meta
 
 
-def _ensure_intro_hook(content, primary_keyword, topic_title):
+# Banned openers that produce weak, non-engaging first paragraphs
+_BANNED_OPENERS = (
+    "in this article", "this article", "fans are asking",
+    "let's", "here's", "today we", "read on", "we explore",
+    "welcome to", "in today's", "are you", "have you",
+    "if you're", "whether you",
+)
+
+
+def _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity=""):
+    """Ensure the first paragraph is substantive, entity-rich, and answers search intent.
+
+    If the AI-generated intro is too short, lacks the keyword, or starts with a
+    banned opener, inject a contextual hook that names the primary entity and
+    states the key development. Never inject a generic spacer.
+    """
     if not content:
         return content
 
-    hook = (
-        f"<p>{primary_keyword} is the key football story right now, with immediate implications for fans, teams, and the wider tournament picture.</p>"
-    )
-
     first_paragraph = re.search(r"<p[^>]*>(.*?)</p>", content, re.IGNORECASE | re.DOTALL)
     if not first_paragraph:
+        # No <p> at all — prepend a contextual hook
+        hook = _build_contextual_hook(primary_keyword, topic_title, primary_entity)
         return hook + content
 
     first_text = html.unescape(re.sub(r"<[^>]+>", "", first_paragraph.group(1))).strip()
-    is_too_short = len(first_text.split()) < 18
+    word_count = len(first_text.split())
+
+    is_too_short = word_count < 18
     lacks_keyword = not _contains_keyword(first_text, primary_keyword)
-    weak_open = first_text.lower().startswith(("in this article", "this article", "fans are asking"))
+    weak_open = first_text.lower().startswith(_BANNED_OPENERS)
 
     if is_too_short or lacks_keyword or weak_open:
+        hook = _build_contextual_hook(primary_keyword, topic_title, primary_entity)
         return content[:first_paragraph.start()] + hook + content[first_paragraph.start():]
     return content
+
+
+def _build_contextual_hook(primary_keyword, topic_title, primary_entity=""):
+    """Build an entity-rich, search-intent-satisfying intro hook.
+
+    Uses the primary entity and topic title to create a specific sentence
+    rather than a generic filler paragraph.
+    """
+    entity = primary_entity or _clean_topic_label(topic_title) or primary_keyword
+
+    # Derive what's happening from the topic title
+    action = _clean_topic_label(topic_title)
+    if not action or action.lower() == entity.lower():
+        action = f"{entity} has emerged as a major talking point"
+    else:
+        # Shorten to something usable as a sentence fragment
+        if len(action) > 80:
+            action = action[:77].rsplit(" ", 1)[0]
+
+    hook = (
+        f"<p>{entity} is at the center of this {primary_keyword} development. "
+        f"{action}, with immediate implications for fans, squads, and the wider tournament picture.</p>"
+    )
+    return hook
 
 
 def _ensure_value_add_paragraph(content, primary_keyword, topic_title):
@@ -202,6 +247,10 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
 
     article["focus_keyword"] = primary_keyword
 
+    # Extract entities for use in meta and intro guards
+    entities = _extract_entities_from_topic(topic_title, primary_keyword)
+    primary_entity = entities.get("primary_entity", "")
+
     title = _clean_topic_label(article.get("title") or topic_title)
     if not title or title.lower() in {"general football", "football", "soccer"} or "_" in title:
         title = _clean_topic_label(topic_title) or primary_keyword
@@ -211,7 +260,9 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     seo_title = article.get("seo_title") or article["title"]
     article["seo_title"] = _build_meta_title(seo_title, primary_keyword, article_title=article["title"])
 
-    article["meta_description"] = _build_meta_description(article.get("meta_description"), primary_keyword)
+    article["meta_description"] = _build_meta_description(
+        article.get("meta_description"), primary_keyword, primary_entity=primary_entity
+    )
 
     slug = _sanitize_slug(article.get("slug"))
     if not slug or primary_keyword.lower().replace(" ", "-") not in slug:
@@ -219,7 +270,7 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     article["slug"] = slug
 
     content = article.get("content", "")
-    content = _ensure_intro_hook(content, primary_keyword, topic_title)
+    content = _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity=primary_entity)
     content = _ensure_value_add_paragraph(content, primary_keyword, topic_title)
     article["content"] = content
     article["full_content"] = content

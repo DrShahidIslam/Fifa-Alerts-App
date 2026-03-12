@@ -208,6 +208,10 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
         "rank_math_title": article.get("seo_title", article.get("title", "")),
         "rank_math_description": article.get("meta_description", ""),
         "rank_math_focus_keyword": article.get("matched_keyword", "") or article.get("focus_keyword", "") or (article.get("tags") or [""])[0] or article.get("title", ""),
+        "rank_math_facebook_title": article.get("seo_title", article.get("title", "")),
+        "rank_math_facebook_description": article.get("meta_description", ""),
+        "rank_math_twitter_title": article.get("seo_title", article.get("title", "")),
+        "rank_math_twitter_description": article.get("meta_description", ""),
         "faq_schema": article.get("faq_schema", ""),
     }
     if featured_image_path and os.path.exists(featured_image_path):
@@ -414,6 +418,10 @@ def _set_rankmath_meta(post_id, article):
             "rank_math_description": article.get("meta_description", ""),
             "rank_math_focus_keyword": focus_kw,
             "rank_math_robots": ["index", "follow"],
+            # OG / social meta — optimized separately from page title
+            "rank_math_facebook_title": article.get("seo_title", article.get("title", "")),
+            "rank_math_facebook_description": article.get("meta_description", ""),
+            "rank_math_twitter_use_facebook": "on",
         }
     }
 
