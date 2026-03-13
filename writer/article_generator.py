@@ -256,7 +256,7 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
         title = _clean_topic_label(topic_title) or primary_keyword
     if not _contains_keyword(title, primary_keyword):
         title = f"{primary_keyword}: {title}" if title else primary_keyword
-    article["title"] = _trim_to_limit(title, 60)
+    article["title"] = title
     seo_title = article.get("seo_title") or article["title"]
     article["seo_title"] = _build_meta_title(seo_title, primary_keyword, article_title=article["title"])
 

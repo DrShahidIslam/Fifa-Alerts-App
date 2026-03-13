@@ -449,20 +449,20 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 
 --- ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ---
 
-1) FOCUS KEYWORD: Treat the PRIMARY KEYWORD as the article's focus keyword for SEO, AEO, GEO, and RankMath.
-2) TITLE SEO: The exact focus keyword must appear in the title once, preferably near the front, while staying natural and under 60 characters.
-3) SEO TITLE: Create a separate SEO meta title that is different from the visible article title. Both titles must contain the exact focus keyword naturally, but they must serve different purposes.
-4) META SEO: The meta description must contain the focus keyword once, name the primary entity (player, team, or event), stay between 145 and 155 characters, and use an action verb plus curiosity gap to invite clicks.
+1) MAIN KEYWORD: Treat the PRIMARY KEYWORD as the article's sole focus for SEO, AEO, GEO. Do not target related or supporting keywords; optimize strictly for the main keyword.
+2) MAIN TITLE: There is NO character limit for the visible article title. It must contain the exact main keyword naturally and include entities (players, teams, etc) if possible. Do NOT truncate the main title.
+3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and MUST be strictly under 60 characters to avoid truncation.
+4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It MUST be strictly between 145 and 155 characters to avoid truncation and fit perfectly within search snippets. Use an action verb plus curiosity gap.
 5) FIRST PARAGRAPH — CRITICAL (this is the most important paragraph for user engagement and SEO):
    a) Must be 25-45 words: enough to be substantive, short enough to be punchy.
    b) Must directly answer the core search intent behind the topic in the very first sentence.
    c) Must name the primary entity (specific player, team, or competition) within the first 12 words.
-   d) Must contain the focus keyword naturally.
+   d) Must contain the main keyword naturally.
    e) BANNED openers: Never start with "In this article", "This article", "Fans are asking", "Let's", "Here's", "Today we", "Read on", "We explore", or any meta-commentary about the article itself. Start with the NEWS.
    f) The second sentence must state WHY this matters or what changed.
 6) ENTITY-FIRST WRITING: Every section's opening sentence should lead with the most important entity name (person, team, or event) as the grammatical subject, not a vague pronoun or filler phrase.
 7) VALUE-ADD ANALYSIS: Include one dedicated paragraph early in the article that goes beyond reporting. It must explain the likely impact of the news on fans, the team or player involved, upcoming matches, rankings, transfers, tactics, or the wider World Cup 2026 picture. This paragraph must be analytical, cautious, and original rather than a reworded summary.
-8) KEYWORD PLACEMENT: Include the focus keyword naturally in the slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
+8) KEYWORD PLACEMENT: Include the main keyword naturally in the short slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
 9) AEO OPTIMIZATION (Answer Engines like Google AI Overview, Perplexity, ChatGPT):
    a) Write at least 3 sentences in the article that directly answer likely search questions (who, what, when, where, why, how) in a single, self-contained, factual sentence that an AI engine can quote verbatim.
    b) Use question-matching phrasing: open at least 2 sentences with "Who", "When", "Why", or "How" to mirror natural queries.
@@ -471,15 +471,16 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
    a) Write with high information density: no filler sentences, every sentence must add a new fact or insight.
    b) Use clear entity co-occurrence: mention related entities together (e.g., player + team + competition in the same sentence) to strengthen knowledge graph signals.
    c) Include at least one "definitive statement" per section that states a verifiable fact clearly.
-11) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
-12) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
+11) EXTERNAL LINKING: Include exactly ONE high-quality, high-authority external link (e.g., to BBC, ESPN, or official sites) naturally in the article to boost SEO.
+12) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
+13) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: Visible on-page headline. Natural, editorial, under 60 chars, and includes the exact focus keyword.
-2. SEO_TITLE: Separate meta title for search results. Must be different from TITLE, under 60 chars, and include the exact focus keyword.
-3. META_DESCRIPTION: 145-155 chars, includes the exact focus keyword AND the primary entity name, and uses a compelling action-oriented hook.
-4. SLUG: keyword-rich, lowercase, hyphens only, and based on the focus keyword.
+1. TITLE: Visible on-page headline. Natural, editorial, NO character limits, and includes the exact main keyword and entities if possible.
+2. SEO_TITLE: Separate meta title for search results. MUST be under 60 chars (to prevent truncation), and includes the exact main keyword.
+3. META_DESCRIPTION: 145-155 chars (no more, no less), includes the exact main keyword AND the primary entity name, and uses a compelling action-oriented hook.
+4. SLUG: extremely short, punchy, keyword-rich, lowercase, hyphens only, and based on the main keyword.
 5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
 6. FAQ: 3-4 schema-ready questions.
 
@@ -511,7 +512,7 @@ STRUCTURE VARIATION (MANDATORY):
 - Variant Guide: {variant['instructions']}
 - Keep all mandatory blocks: key facts callout, important update callout, CTA block, FAQ plus JSON-LD.
 - Use 4-6 topical sections with unique H2 headings based on the story.
-- At least one H2 must contain the focus keyword or a very close natural variation.
+- At least one H2 must contain the main keyword or a very close natural variation.
 - The opening 120 words must directly satisfy the likely search query before expanding into analysis.
 - Include a standalone "Why this matters" or equivalent analysis section within the first half of the article.
 - Do not use generic headings such as "Next Section" or "Another Section".
