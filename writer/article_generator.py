@@ -96,9 +96,71 @@ def _contains_keyword(text, keyword):
 
 def _clean_topic_label(value):
     value = _normalize_whitespace((value or "").replace("_", " "))
+    value = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", value)
     value = re.sub(r"^(general football|football|soccer)\s*[:\-]\s*", "", value, flags=re.IGNORECASE)
     value = re.sub(r"\s*[|:,-]+\s*$", "", value).strip()
     return value
+
+
+def _strip_title_markup(value):
+    value = _clean_topic_label(value)
+    value = re.sub(r"[`#]+", "", value)
+    value = re.sub(r"\s{2,}", " ", value)
+    return value.strip(" -:|,")
+
+
+def _dedupe_title_phrases(title):
+    parts = [part.strip(" -:|,") for part in re.split(r"\s*[:|,-]\s*", title) if part.strip(" -:|,")]
+    deduped = []
+    seen = set()
+    for part in parts:
+        key = part.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(part)
+    return ": ".join(deduped) if deduped else title
+
+
+def _build_article_title(raw_title, primary_keyword, topic_title, primary_entity=""):
+    title = _dedupe_title_phrases(_strip_title_markup(raw_title or ""))
+    topic = _strip_title_markup(topic_title)
+    keyword = _strip_title_markup(primary_keyword)
+    entity = _strip_title_markup(primary_entity)
+
+    if not title or title.lower() in {"general football", "football", "soccer"}:
+        title = topic or keyword
+
+    if not _contains_keyword(title, keyword):
+        lead = entity or topic
+        if lead and lead.lower() != keyword.lower():
+            title = f"{lead}: {keyword}"
+        else:
+            title = keyword or title
+
+    title = re.split(r"\s+By\s+\w+", title, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+    title = re.sub(r"\b(the endur\w+ quest.*|with immediate implications.*)$", "", title, flags=re.IGNORECASE).strip(" -:|,")
+
+    segments = [seg.strip() for seg in re.split(r"\s*:\s*", title) if seg.strip()]
+    if len(segments) > 2:
+        title = ": ".join(segments[:2])
+
+    if len(title) > 70:
+        candidate = ""
+        if entity and keyword and entity.lower() != keyword.lower():
+            candidate = f"{entity}: {keyword}"
+        elif keyword:
+            candidate = keyword
+        if topic and keyword and topic.lower() != keyword.lower():
+            topic_words = topic.split()
+            short_topic = " ".join(topic_words[:6]).strip(" -:|,")
+            candidate = f"{short_topic}: {keyword}" if short_topic else candidate
+        title = candidate or title
+
+    if len(title) > 70:
+        title = _trim_to_limit(title, 70)
+
+    return title.strip(" -:|,")
 
 
 def _derive_focus_keyword(primary_keyword, topic_title):
@@ -251,11 +313,12 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     entities = _extract_entities_from_topic(topic_title, primary_keyword)
     primary_entity = entities.get("primary_entity", "")
 
-    title = _clean_topic_label(article.get("title") or topic_title)
-    if not title or title.lower() in {"general football", "football", "soccer"} or "_" in title:
-        title = _clean_topic_label(topic_title) or primary_keyword
-    if not _contains_keyword(title, primary_keyword):
-        title = f"{primary_keyword}: {title}" if title else primary_keyword
+    title = _build_article_title(
+        article.get("title") or topic_title,
+        primary_keyword,
+        topic_title,
+        primary_entity=primary_entity,
+    )
     article["title"] = title
     seo_title = article.get("seo_title") or article["title"]
     article["seo_title"] = _build_meta_title(seo_title, primary_keyword, article_title=article["title"])
@@ -272,6 +335,8 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     content = article.get("content", "")
     content = _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity=primary_entity)
     content = _ensure_value_add_paragraph(content, primary_keyword, topic_title)
+    content = _normalize_generated_ui_blocks(content)
+    content = _sanitize_dark_theme_text_colors(content)
     article["content"] = content
     article["full_content"] = content
     return article
@@ -571,6 +636,60 @@ def _normalize_generated_ui_blocks(content):
         content,
         flags=re.IGNORECASE,
     )
+    return content
+
+
+def _sanitize_dark_theme_text_colors(content):
+    """Remove black inline text colors from normal article content on dark themes."""
+    if not content:
+        return content
+
+    protected_blocks = []
+
+    def _protect(match):
+        protected_blocks.append(match.group(0))
+        return f"__PROTECTED_BLOCK_{len(protected_blocks) - 1}__"
+
+    light_box_pattern = re.compile(
+        r"<div[^>]*style=[\"'][^\"']*(?:background-color:#f9f9f9|background-color:#fffdf5)[^\"']*[\"'][^>]*>.*?</div>",
+        re.IGNORECASE | re.DOTALL,
+    )
+    content = light_box_pattern.sub(_protect, content)
+
+    def _clean_tag_style(match):
+        tag_name = match.group(1)
+        attrs = match.group(2) or ""
+        style_match = re.search(r'style=(["\'])(.*?)\1', attrs, re.IGNORECASE | re.DOTALL)
+        if not style_match:
+            return match.group(0)
+
+        style_value = style_match.group(2)
+        cleaned_style = re.sub(
+            r"(?:^|;)\s*color\s*:\s*(?:#000|#000000|black)\s*;?",
+            ";",
+            style_value,
+            flags=re.IGNORECASE,
+        )
+        cleaned_style = re.sub(r";{2,}", ";", cleaned_style).strip(" ;")
+
+        if cleaned_style:
+            new_attrs = attrs[:style_match.start()] + f'style="{cleaned_style}"' + attrs[style_match.end():]
+        else:
+            new_attrs = attrs[:style_match.start()] + attrs[style_match.end():]
+
+        new_attrs = re.sub(r"\s{2,}", " ", new_attrs).rstrip()
+        return f"<{tag_name}{new_attrs}>"
+
+    content = re.sub(
+        r"<(h[1-6]|p|ul|ol|li)([^>]*)>",
+        _clean_tag_style,
+        content,
+        flags=re.IGNORECASE,
+    )
+
+    for idx, block in enumerate(protected_blocks):
+        content = content.replace(f"__PROTECTED_BLOCK_{idx}__", block)
+
     return content
 
 

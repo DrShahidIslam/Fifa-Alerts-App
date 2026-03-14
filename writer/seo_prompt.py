@@ -450,7 +450,7 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 --- ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ---
 
 1) MAIN KEYWORD: Treat the PRIMARY KEYWORD as the article's sole focus for SEO, AEO, GEO. Do not target related or supporting keywords; optimize strictly for the main keyword.
-2) MAIN TITLE: There is NO character limit for the visible article title. It must contain the exact main keyword naturally and include entities (players, teams, etc) if possible. Do NOT truncate the main title.
+2) MAIN TITLE: Keep the visible article title compact and editorial, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). Do not stack multiple clauses or repeat the same keyword.
 3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and MUST be strictly under 60 characters to avoid truncation.
 4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It MUST be strictly between 145 and 155 characters to avoid truncation and fit perfectly within search snippets. Use an action verb plus curiosity gap.
 5) FIRST PARAGRAPH — CRITICAL (this is the most important paragraph for user engagement and SEO):
@@ -477,7 +477,7 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: Visible on-page headline. Natural, editorial, NO character limits, and includes the exact main keyword and entities if possible.
+1. TITLE: Visible on-page headline. Natural, editorial, compact, and usually 45-70 characters. Include a hook, the exact main keyword, and one supporting keyword or entity if it fits naturally.
 2. SEO_TITLE: Separate meta title for search results. MUST be under 60 chars (to prevent truncation), and includes the exact main keyword.
 3. META_DESCRIPTION: 145-155 chars (no more, no less), includes the exact main keyword AND the primary entity name, and uses a compelling action-oriented hook.
 4. SLUG: extremely short, punchy, keyword-rich, lowercase, hyphens only, and based on the main keyword.
