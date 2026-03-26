@@ -127,6 +127,11 @@ def send_article_preview(article_data):
     meta = article_data.get("meta_description", "")
     slug = article_data.get("slug", "")
     word_count = article_data.get("word_count", 0)
+    source_quality = article_data.get("source_quality") or {}
+    source_count = source_quality.get("source_count", 0)
+    unique_domain_count = source_quality.get("unique_domain_count", 0)
+    source_domains = ", ".join((source_quality.get("unique_domains") or [])[:4]) or "N/A"
+    editorial_flags = article_data.get("editorial_flags") or []
     content_preview = article_data.get("content", "")[:800]
 
     lines = [
@@ -138,10 +143,20 @@ def send_article_preview(article_data):
         f"Slug: /{slug}",
         f"Meta: {meta}",
         f"Words: {word_count}",
+        f"Sources: {source_count} extracted / {unique_domain_count} domains",
+        f"Domains: {source_domains}",
+        f"Manual fact check: {'Yes' if article_data.get('needs_manual_fact_check') else 'No'}",
         "",
         "Preview:",
         f"{content_preview}...",
     ]
+
+    if editorial_flags:
+        lines.extend([
+            "",
+            "QA flags:",
+            *[f"- {flag}" for flag in editorial_flags[:3]],
+        ])
 
     message = "\n".join(lines)
 

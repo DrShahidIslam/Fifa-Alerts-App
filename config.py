@@ -170,6 +170,8 @@ WP_DEFAULT_STATUS = "draft"     # 'draft', 'pending', or 'publish'
 # â”€â”€ Article Generation Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ARTICLE_MIN_WORDS = 800
 ARTICLE_MAX_WORDS = 1500
+ARTICLE_MIN_SOURCES = int(os.getenv("ARTICLE_MIN_SOURCES", "2"))
+ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS = int(os.getenv("ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS", "2"))
 GEMINI_MODEL = "gemini-2.5-flash"
 # Set to True to skip AI image generation (saves Gemini quota; article publishes without featured image)
 SKIP_AI_IMAGE = os.getenv("SKIP_AI_IMAGE", "false").lower() in ("true", "1", "yes")

@@ -47,6 +47,26 @@ def _validate_article_before_publish(article):
         errors.append("Missing article content")
         return errors, warnings
 
+    source_quality = article.get("source_quality") or {}
+    source_count = int(source_quality.get("source_count") or 0)
+    unique_domain_count = int(source_quality.get("unique_domain_count") or 0)
+    min_sources = getattr(config, "ARTICLE_MIN_SOURCES", 2)
+    min_domains = getattr(config, "ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS", 2)
+
+    if source_quality.get("uses_aggregated_summary_only"):
+        errors.append("Article relies only on aggregated summaries, not extracted reporting")
+    elif source_count < min_sources:
+        warnings.append(f"Only {source_count} extracted source(s); target is {min_sources}+")
+
+    if unique_domain_count < min_domains:
+        warnings.append(
+            f"Only {unique_domain_count} unique source domain(s); target is {min_domains}+ for live publication"
+        )
+
+    editorial_flags = article.get("editorial_flags") or []
+    if editorial_flags:
+        warnings.extend(editorial_flags)
+
     content_lower = content.lower()
     has_faq_heading = bool(
         re.search(
@@ -96,6 +116,12 @@ def create_post(article, featured_image_path=None, status=None):
     qa_errors, qa_warnings = _validate_article_before_publish(article)
     for warning in qa_warnings:
         logger.warning(f"  QA warning: {warning}")
+    if status and status.lower() == "publish":
+        source_quality = article.get("source_quality") or {}
+        if source_quality.get("source_count", 0) < getattr(config, "ARTICLE_MIN_SOURCES", 2):
+            qa_errors.append("Live publish blocked: not enough extracted source material")
+        if source_quality.get("unique_domain_count", 0) < getattr(config, "ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS", 2):
+            qa_errors.append("Live publish blocked: not enough independent source domains")
     if qa_errors:
         LAST_PUBLISH_ERROR = "Pre-publish QA failed: " + "; ".join(qa_errors[:4])
         logger.error(f"  {LAST_PUBLISH_ERROR}")

@@ -191,6 +191,65 @@ def _sanitize_slug(value):
     return slug[:70].strip("-")
 
 
+def _summarize_source_quality(source_texts):
+    """Build simple source-quality metadata for editorial QA and publish gating."""
+    quality = {
+        "source_count": 0,
+        "unique_domains": [],
+        "unique_domain_count": 0,
+        "source_urls": [],
+        "uses_aggregated_summary_only": False,
+        "needs_manual_fact_check": False,
+        "flags": [],
+    }
+
+    if not source_texts:
+        quality["uses_aggregated_summary_only"] = True
+        quality["needs_manual_fact_check"] = True
+        quality["flags"].append("No extracted source material was available.")
+        return quality
+
+    urls = []
+    domains = []
+    only_aggregated = True
+    for src in source_texts:
+        domain = (src.get("source_domain") or "").strip().lower()
+        url = (src.get("url") or "").strip()
+        if domain:
+            domains.append(domain)
+        if url:
+            urls.append(url)
+        if domain and domain != "aggregated_summaries":
+            only_aggregated = False
+
+    unique_domains = []
+    seen = set()
+    for domain in domains:
+        if domain and domain not in seen:
+            seen.add(domain)
+            unique_domains.append(domain)
+
+    quality["source_count"] = len(source_texts)
+    quality["unique_domains"] = unique_domains
+    quality["unique_domain_count"] = len(unique_domains)
+    quality["source_urls"] = urls
+    quality["uses_aggregated_summary_only"] = only_aggregated
+
+    if only_aggregated:
+        quality["flags"].append("Only aggregated topic summaries were available.")
+    if quality["source_count"] < getattr(config, "ARTICLE_MIN_SOURCES", 2):
+        quality["flags"].append(
+            f"Only {quality['source_count']} extracted source(s); target is at least {getattr(config, 'ARTICLE_MIN_SOURCES', 2)}."
+        )
+    if quality["unique_domain_count"] < getattr(config, "ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS", 2):
+        quality["flags"].append(
+            "Not enough independent source domains for confident live publication."
+        )
+
+    quality["needs_manual_fact_check"] = bool(quality["flags"])
+    return quality
+
+
 def _build_meta_title(seo_title, primary_keyword, article_title=""):
     seo_title = _normalize_whitespace(seo_title)
     if not _contains_keyword(seo_title, primary_keyword):
@@ -402,6 +461,10 @@ def generate_article(topic, source_urls=None):
             "url": "",
         }]
 
+    source_quality = _summarize_source_quality(source_texts)
+    if source_quality["flags"]:
+        logger.warning("  Source quality flags: " + " | ".join(source_quality["flags"]))
+
     # Step 2: Build the prompt
     prompt = build_article_prompt(
         topic_title=topic.get("topic", "World Cup 2026 Update"),
@@ -429,6 +492,10 @@ def generate_article(topic, source_urls=None):
     if article:
         article = _apply_seo_guards(article, topic.get("matched_keyword", ""), topic.get("topic", ""))
         article["sources_used"] = [s.get("source_domain", "") for s in source_texts]
+        article["source_urls"] = source_quality["source_urls"]
+        article["source_quality"] = source_quality
+        article["editorial_flags"] = source_quality["flags"]
+        article["needs_manual_fact_check"] = source_quality["needs_manual_fact_check"]
         article["word_count"] = len(article.get("content", "").split())
         logger.info(f"  Article generated: '{article['title']}' ({article['word_count']} words)")
     else:

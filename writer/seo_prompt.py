@@ -474,6 +474,11 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 11) EXTERNAL LINKING: Include exactly ONE high-quality, high-authority external link (e.g., to BBC, ESPN, or official sites) naturally in the article to boost SEO.
 12) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
 13) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
+14) ORIGINALITY AND ATTRIBUTION:
+   a) Do not paraphrase source articles section by section. Synthesize them into a single original narrative.
+   b) Only state facts that are clearly supported by the source material above.
+   c) When a fact is time-sensitive, attribute it naturally to the reporting or official update rather than presenting a stitched rumor summary as settled fact.
+   d) If the source material is thin or conflicting, acknowledge uncertainty briefly instead of filling gaps.
 
 --- ARTICLE STRUCTURE ---
 
