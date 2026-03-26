@@ -239,6 +239,19 @@ def _calculate_spike_score(cluster_stories, conn):
     return round(score, 1), factors
 
 
+def _pick_best_story(cluster_stories):
+    """Prefer a real reporting source over a synthetic trend signal for topic naming."""
+    ranked = sorted(
+        cluster_stories,
+        key=lambda s: (
+            1 if s.get("source_type") in {"rss", "newsapi"} else 0,
+            len(s.get("title", "")),
+        ),
+        reverse=True,
+    )
+    return ranked[0] if ranked else {}
+
+
 def detect_spikes(all_stories, trends_data=None):
     """
     Main detection function.
@@ -252,12 +265,12 @@ def detect_spikes(all_stories, trends_data=None):
             if trend.get("is_rising"):
                 combined.append(
                     {
-                        "title": f"Rising search: {trend['keyword']}",
-                        "summary": f"Google Trends shows '{trend['keyword']}' is rising ({trend.get('spike_ratio', 0)}x above average)",
+                        "title": trend["keyword"],
+                        "summary": f"Search signal detected for {trend['keyword']}",
                         "url": f"https://trends.google.com/trends/explore?q={trend['keyword'].replace(' ', '+')}",
                         "source": trend.get("source", "Google Trends"),
                         "source_type": "trends",
-                        "matched_keyword": trend["keyword"],
+                        "matched_keyword": trend.get("matched_keyword", trend["keyword"]),
                         "published_at": trend.get("recorded_at", datetime.utcnow()),
                         "story_hash": hashlib.sha256(trend["keyword"].encode()).hexdigest()[:16],
                         "is_rising": True,
@@ -306,7 +319,7 @@ def detect_spikes(all_stories, trends_data=None):
         if score < min_score:
             continue
 
-        best_story = max(cluster_stories, key=lambda s: len(s.get("title", "")))
+        best_story = _pick_best_story(cluster_stories)
         trending_topics.append(
             {
                 "topic": best_story.get("title", "Untitled"),

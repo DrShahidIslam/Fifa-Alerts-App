@@ -75,6 +75,21 @@ def _search_news_for_trend(keyword):
     return urls
 
 
+def _dedupe_keep_order(values):
+    seen = set()
+    unique = []
+    for value in values:
+        normalized = (value or "").strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(normalized)
+    return unique
+
+
 def _normalize_whitespace(value):
     return re.sub(r"\s+", " ", (value or "")).strip()
 
@@ -100,6 +115,13 @@ def _clean_topic_label(value):
     value = re.sub(r"^(general football|football|soccer)\s*[:\-]\s*", "", value, flags=re.IGNORECASE)
     value = re.sub(r"\s*[|:,-]+\s*$", "", value).strip()
     return value
+
+
+def _clean_topic_for_editorial_use(topic_title):
+    text = _clean_topic_label(topic_title)
+    text = re.sub(r"^(rising search|trending)\s*:\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bsearch signal detected for\b", "", text, flags=re.IGNORECASE).strip(" -:|,")
+    return text
 
 
 def _strip_title_markup(value):
@@ -248,6 +270,83 @@ def _summarize_source_quality(source_texts):
 
     quality["needs_manual_fact_check"] = bool(quality["flags"])
     return quality
+
+
+def _source_title_terms(source_texts, limit=3):
+    terms = []
+    for src in (source_texts or [])[:limit]:
+        title = _clean_topic_label(src.get("title", ""))
+        if title:
+            terms.append(title)
+    return _dedupe_keep_order(terms)
+
+
+def _derive_keyword_strategy(topic_title, matched_keyword, source_texts=None):
+    primary = _derive_focus_keyword(matched_keyword, topic_title)
+    candidates = []
+    cleaned_topic = _clean_topic_for_editorial_use(topic_title)
+    if cleaned_topic and cleaned_topic.lower() != primary.lower():
+        candidates.append(cleaned_topic)
+
+    entities = _extract_entities_from_topic(topic_title, matched_keyword or "", source_texts)
+    candidates.extend(entities.get("players", []))
+    candidates.extend(entities.get("teams", []))
+    candidates.extend(entities.get("competitions", []))
+    candidates.extend(_source_title_terms(source_texts))
+
+    secondary = []
+    supporting = []
+    seen = {primary.lower()}
+    for item in candidates:
+        cleaned = _clean_topic_label(item)
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if len(secondary) < 4:
+            secondary.append(cleaned)
+        elif len(supporting) < 8:
+            supporting.append(cleaned)
+
+    return {
+        "primary": primary,
+        "secondary": secondary,
+        "supporting": supporting,
+    }
+
+
+def _build_research_queries(topic, source_texts=None):
+    topic_title = _clean_topic_for_editorial_use(topic.get("topic", ""))
+    matched_keyword = _clean_topic_label(topic.get("matched_keyword", ""))
+    strategy = _derive_keyword_strategy(topic_title, matched_keyword, source_texts)
+
+    queries = []
+    if topic_title:
+        queries.append(topic_title)
+        queries.append(f"{topic_title} world cup")
+    if matched_keyword and matched_keyword.lower() != topic_title.lower():
+        queries.append(matched_keyword)
+        queries.append(f"{matched_keyword} latest")
+    for item in strategy["secondary"][:3]:
+        queries.append(item)
+        queries.append(f"{item} world cup")
+    for src in (topic.get("stories") or [])[:3]:
+        title = _clean_topic_label(src.get("title", ""))
+        if title:
+            queries.append(title)
+
+    return _dedupe_keep_order(queries)[:getattr(config, "ARTICLE_RESEARCH_QUERY_LIMIT", 6)]
+
+
+def _discover_additional_source_urls(topic, existing_urls=None, source_texts=None):
+    discovered = list(existing_urls or [])
+    for query in _build_research_queries(topic, source_texts=source_texts):
+        for url in _search_news_for_trend(query):
+            if url not in discovered:
+                discovered.append(url)
+    return discovered
 
 
 def _build_meta_title(seo_title, primary_keyword, article_title=""):
@@ -401,6 +500,23 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     return article
 
 
+def _remove_search_trend_talk(content):
+    """Strip low-value paragraphs about search buzz instead of the story itself."""
+    if not content:
+        return content
+
+    patterns = [
+        r"<p[^>]*>[^<]*(?:trending on google|rising search|search volume|search interest)[^<]*</p>",
+        r"<p[^>]*>[^<]*(?:fans are searching|people are searching|searched a lot|being searched)[^<]*</p>",
+        r"<h2[^>]*>[^<]*(?:why .* is trending|why .* is being searched)[^<]*</h2>\s*<p[^>]*>.*?</p>",
+    ]
+    cleaned = content
+    for pattern in patterns:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def generate_article(topic, source_urls=None):
     """
     Generate a complete SEO-optimized article for a trending topic.
@@ -415,6 +531,8 @@ def generate_article(topic, source_urls=None):
                         content (HTML), faq_html, word_count, sources_used
         or None if generation fails
     """
+    topic = dict(topic or {})
+    topic["topic"] = _clean_topic_for_editorial_use(topic.get("topic", "Unknown"))
     logger.info(f"Generating article for: {topic.get('topic', 'Unknown')}")
 
     # Step 1: Gather source material
@@ -430,26 +548,22 @@ def generate_article(topic, source_urls=None):
     if top_url and top_url not in source_urls:
         source_urls.insert(0, top_url)
 
-    # Check if this is a pure trend alert (only trends.google.com URLs)
-    is_pure_trend = True
-    if not source_urls:
-        is_pure_trend = True
-    else:
-        for url in source_urls:
-            if "trends.google.com" not in url:
-                is_pure_trend = False
-                break
-
+    # Trend-led topics should trigger a wider reporting search before drafting.
+    is_pure_trend = (not source_urls) or all("trends.google.com" in url for url in source_urls)
     if is_pure_trend:
-        keyword = topic.get("matched_keyword") or topic.get("topic", "").replace("Rising search:", "").strip()
-        logger.info(f"  Pure trend detected. Searching active news for: '{keyword}'")
-        found_urls = _search_news_for_trend(keyword)
-        if found_urls:
-            source_urls.extend(found_urls)
-            logger.info(f"  Found {len(found_urls)} background articles for context.")
+        keyword = topic.get("matched_keyword") or topic.get("topic", "")
+        logger.info(f"  Trend-led topic detected. Expanding reporting search for: '{keyword}'")
+        source_urls = _discover_additional_source_urls(topic, existing_urls=source_urls)
 
     logger.info(f"  Fetching {len(source_urls)} source URLs...")
     source_texts = fetch_multiple_sources(source_urls, max_sources=8)
+
+    if len(source_texts) < getattr(config, "ARTICLE_MIN_SOURCES", 2):
+        expanded_urls = _discover_additional_source_urls(topic, existing_urls=source_urls, source_texts=source_texts)
+        if len(expanded_urls) > len(source_urls):
+            logger.info(f"  Thin sourcing detected. Retrying extraction with {len(expanded_urls)} URLs.")
+            source_urls = expanded_urls
+            source_texts = fetch_multiple_sources(source_urls, max_sources=10)
 
     if not source_texts:
         logger.warning("  No source material could be extracted. Using topic summary only.")
@@ -465,11 +579,18 @@ def generate_article(topic, source_urls=None):
     if source_quality["flags"]:
         logger.warning("  Source quality flags: " + " | ".join(source_quality["flags"]))
 
+    keyword_strategy = _derive_keyword_strategy(
+        topic.get("topic", "World Cup 2026 Update"),
+        topic.get("matched_keyword", ""),
+        source_texts=source_texts,
+    )
+
     # Step 2: Build the prompt
     prompt = build_article_prompt(
         topic_title=topic.get("topic", "World Cup 2026 Update"),
         source_texts=source_texts,
-        matched_keyword=topic.get("matched_keyword", "")
+        matched_keyword=topic.get("matched_keyword", ""),
+        keyword_strategy=keyword_strategy,
     )
 
     # Step 3: Call Gemini (with retry)
@@ -491,11 +612,14 @@ def generate_article(topic, source_urls=None):
 
     if article:
         article = _apply_seo_guards(article, topic.get("matched_keyword", ""), topic.get("topic", ""))
+        article["content"] = _remove_search_trend_talk(article.get("content", ""))
+        article["full_content"] = article["content"]
         article["sources_used"] = [s.get("source_domain", "") for s in source_texts]
         article["source_urls"] = source_quality["source_urls"]
         article["source_quality"] = source_quality
         article["editorial_flags"] = source_quality["flags"]
         article["needs_manual_fact_check"] = source_quality["needs_manual_fact_check"]
+        article["keyword_strategy"] = keyword_strategy
         article["word_count"] = len(article.get("content", "").split())
         logger.info(f"  Article generated: '{article['title']}' ({article['word_count']} words)")
     else:

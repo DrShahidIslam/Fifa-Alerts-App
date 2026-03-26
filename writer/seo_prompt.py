@@ -383,7 +383,7 @@ def _select_article_variant(topic_title, matched_keyword):
     return ARTICLE_STRUCTURE_VARIANTS[idx]
 
 
-def build_article_prompt(topic_title, source_texts, matched_keyword=""):
+def build_article_prompt(topic_title, source_texts, matched_keyword="", keyword_strategy=None):
     """
     Build the master SEO prompt for Gemini article generation.
 
@@ -432,6 +432,14 @@ def build_article_prompt(topic_title, source_texts, matched_keyword=""):
         for item in selected_links
     ])
 
+    keyword_strategy = keyword_strategy or {
+        "primary": matched_keyword or topic_title,
+        "secondary": [],
+        "supporting": [],
+    }
+    secondary_keywords = ", ".join(keyword_strategy.get("secondary", [])[:4]) or "None"
+    supporting_keywords = ", ".join(keyword_strategy.get("supporting", [])[:8]) or "None"
+
     prompt = f"""You are an expert sports journalist and master of Semantic Search, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization) for fifa-worldcup26.com.
 Your articles must be engineered to rank by providing high information density, clear entity relationships, and direct answers.
 
@@ -440,6 +448,8 @@ TASK: Write a complete, publish-ready article about the following trending topic
 TRENDING TOPIC: {topic_title}
 PRIMARY KEYWORD: {matched_keyword or topic_title}
 FOCUS KEYWORD: {matched_keyword or topic_title}
+SECONDARY KEYWORDS: {secondary_keywords}
+SUPPORTING KEYWORDS: {supporting_keywords}
 
 --- IDENTIFIED ENTITIES (emphasize these throughout the article) ---
 {entity_block}
@@ -449,7 +459,10 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
 
 --- ADVANCED OPTIMIZATION RULES (NON-NEGOTIABLE) ---
 
-1) MAIN KEYWORD: Treat the PRIMARY KEYWORD as the article's sole focus for SEO, AEO, GEO. Do not target related or supporting keywords; optimize strictly for the main keyword.
+1) KEYWORD STRATEGY:
+   a) Treat the PRIMARY KEYWORD as the lead search target.
+   b) Use SECONDARY KEYWORDS only where they genuinely improve topical coverage.
+   c) Use SUPPORTING KEYWORDS to deepen context, FAQs, and entity relationships. Do not stuff them.
 2) MAIN TITLE: Keep the visible article title compact and editorial, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). Do not stack multiple clauses or repeat the same keyword.
 3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and MUST be strictly under 60 characters to avoid truncation.
 4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It MUST be strictly between 145 and 155 characters to avoid truncation and fit perfectly within search snippets. Use an action verb plus curiosity gap.
@@ -479,6 +492,11 @@ FOCUS KEYWORD: {matched_keyword or topic_title}
    b) Only state facts that are clearly supported by the source material above.
    c) When a fact is time-sensitive, attribute it naturally to the reporting or official update rather than presenting a stitched rumor summary as settled fact.
    d) If the source material is thin or conflicting, acknowledge uncertainty briefly instead of filling gaps.
+15) THIN-CONTENT AVOIDANCE:
+   a) Never discuss that the topic is trending, rising in searches, or popular on Google unless the story itself is literally about search data.
+   b) Never use headings like "Why this is trending" or "Why fans are searching for this".
+   c) Treat trend signals only as newsroom discovery signals, not as article substance.
+   d) Every section must add confirmed facts, context, implications, or practical next steps.
 
 --- ARTICLE STRUCTURE ---
 
@@ -521,6 +539,7 @@ STRUCTURE VARIATION (MANDATORY):
 - The opening 120 words must directly satisfy the likely search query before expanding into analysis.
 - Include a standalone "Why this matters" or equivalent analysis section within the first half of the article.
 - Do not use generic headings such as "Next Section" or "Another Section".
+- Build comprehensive coverage: answer the update first, then expand with timeline, context, implications, affected teams or players, and what comes next.
 
 INTERNAL LINKING RULES (STRICT):
 - Use only genuine internal links from the list below. Do NOT invent URLs. If you hallucinate URLs that are not in this list, you will be penalized.
