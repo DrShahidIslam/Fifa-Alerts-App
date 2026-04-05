@@ -374,6 +374,54 @@ def _build_meta_description(meta_description, primary_keyword, primary_entity=""
     return meta
 
 
+def _strip_html_tags(value):
+    return html.unescape(re.sub(r"<[^>]+>", " ", value or ""))
+
+
+def _clean_sentence_fragment(value, limit=180):
+    text = _normalize_whitespace(_strip_html_tags(value))
+    text = re.sub(r"^[\-:;,. ]+", "", text)
+    if len(text) > limit:
+        text = _trim_to_limit(text, limit)
+    return text
+
+
+def _derive_intro_facts(topic_title, source_texts=None):
+    facts = []
+    seen = set()
+    for candidate in [topic_title] + [src.get("title", "") for src in (source_texts or [])[:3]]:
+        cleaned = _clean_sentence_fragment(candidate, limit=140)
+        key = cleaned.lower()
+        if not cleaned or key in seen:
+            continue
+        seen.add(key)
+        facts.append(cleaned)
+    return facts
+
+
+def _derive_analysis_context(topic_title, primary_keyword, source_texts=None):
+    entities = _extract_entities_from_topic(topic_title, primary_keyword, source_texts)
+    focus = entities.get("primary_entity") or _clean_topic_label(topic_title) or primary_keyword
+    team_or_comp = ""
+    if entities.get("teams"):
+        team_or_comp = entities["teams"][0]
+    elif entities.get("competitions"):
+        team_or_comp = entities["competitions"][0]
+
+    source_fact = ""
+    for src in source_texts or []:
+        title = _clean_sentence_fragment(src.get("title", ""), limit=110)
+        if title:
+            source_fact = title
+            break
+
+    return {
+        "focus": focus,
+        "team_or_comp": team_or_comp,
+        "source_fact": source_fact,
+    }
+
+
 # Banned openers that produce weak, non-engaging first paragraphs
 _BANNED_OPENERS = (
     "in this article", "this article", "fans are asking",
@@ -383,7 +431,7 @@ _BANNED_OPENERS = (
 )
 
 
-def _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity=""):
+def _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity="", source_texts=None):
     """Ensure the first paragraph is substantive, entity-rich, and answers search intent.
 
     If the AI-generated intro is too short, lacks the keyword, or starts with a
@@ -396,7 +444,12 @@ def _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity="")
     first_paragraph = re.search(r"<p[^>]*>(.*?)</p>", content, re.IGNORECASE | re.DOTALL)
     if not first_paragraph:
         # No <p> at all — prepend a contextual hook
-        hook = _build_contextual_hook(primary_keyword, topic_title, primary_entity)
+        hook = _build_contextual_hook(
+            primary_keyword,
+            topic_title,
+            primary_entity,
+            source_texts=source_texts,
+        )
         return hook + content
 
     first_text = html.unescape(re.sub(r"<[^>]+>", "", first_paragraph.group(1))).strip()
@@ -407,12 +460,17 @@ def _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity="")
     weak_open = first_text.lower().startswith(_BANNED_OPENERS)
 
     if is_too_short or lacks_keyword or weak_open:
-        hook = _build_contextual_hook(primary_keyword, topic_title, primary_entity)
-        return content[:first_paragraph.start()] + hook + content[first_paragraph.start():]
+        hook = _build_contextual_hook(
+            primary_keyword,
+            topic_title,
+            primary_entity,
+            source_texts=source_texts,
+        )
+        return content[:first_paragraph.start()] + hook + content[first_paragraph.end():]
     return content
 
 
-def _build_contextual_hook(primary_keyword, topic_title, primary_entity=""):
+def _build_contextual_hook(primary_keyword, topic_title, primary_entity="", source_texts=None):
     """Build an entity-rich, search-intent-satisfying intro hook.
 
     Uses the primary entity and topic title to create a specific sentence
@@ -420,35 +478,62 @@ def _build_contextual_hook(primary_keyword, topic_title, primary_entity=""):
     """
     entity = primary_entity or _clean_topic_label(topic_title) or primary_keyword
 
-    # Derive what's happening from the topic title
-    action = _clean_topic_label(topic_title)
-    if not action or action.lower() == entity.lower():
-        action = f"{entity} has emerged as a major talking point"
+    facts = _derive_intro_facts(topic_title, source_texts=source_texts)
+    primary_fact = facts[0] if facts else f"{entity} has emerged as a major talking point"
+    secondary_fact = facts[1] if len(facts) > 1 else ""
+
+    first_sentence = f"{entity} is driving the latest {primary_keyword} update as {primary_fact}."
+    if secondary_fact and secondary_fact.lower() not in primary_fact.lower():
+        second_sentence = (
+            f"This matters because {secondary_fact[0].lower() + secondary_fact[1:]} could shift selection, momentum, "
+            f"or the wider tournament picture."
+        )
     else:
-        # Shorten to something usable as a sentence fragment
-        if len(action) > 80:
-            action = action[:77].rsplit(" ", 1)[0]
+        second_sentence = (
+            "This matters because the development changes the immediate outlook for fans, squads, and the wider tournament picture."
+        )
 
-    hook = (
-        f"<p>{entity} is at the center of this {primary_keyword} development. "
-        f"{action}, with immediate implications for fans, squads, and the wider tournament picture.</p>"
-    )
-    return hook
+    return f"<p>{_normalize_whitespace(first_sentence)} {_normalize_whitespace(second_sentence)}</p>"
 
 
-def _ensure_value_add_paragraph(content, primary_keyword, topic_title):
+def _ensure_value_add_paragraph(content, primary_keyword, topic_title, source_texts=None):
     if not content:
         return content
 
     if re.search(r"why this matters|why it matters|impact on|what this means", content, re.IGNORECASE):
         return content
 
-    focus = _clean_topic_label(topic_title) or primary_keyword
-    impact_block = (
-        f"<h2>Why this matters</h2>"
-        f"<p>Beyond the headline, {focus} could shape fan expectations, selection decisions, and the wider World Cup 2026 conversation. "
-        f"The immediate effect will depend on how the story develops, but it already gives supporters and analysts a clearer signal about what to watch next.</p>"
-    )
+    context = _derive_analysis_context(topic_title, primary_keyword, source_texts=source_texts)
+    focus = context["focus"]
+    team_or_comp = context["team_or_comp"]
+    source_fact = context["source_fact"]
+    heading_options = [
+        "Why this matters",
+        "Why the update matters",
+        f"What {focus} changes next" if focus else "What changes next",
+        f"The bigger picture for {team_or_comp}" if team_or_comp else "The bigger picture",
+    ]
+    heading = next((item for item in heading_options if item), "Why this matters")
+
+    paragraph_options = [
+        (
+            f"<p>{focus} is now more than a one-cycle headline because it can alter selection decisions, match preparation, "
+            f"and the way supporters read the broader tournament picture.</p>"
+            f"<p>{source_fact or focus} gives this story weight beyond rumor, and the next confirmed update should clarify whether the momentum around {primary_keyword} becomes a lasting shift.</p>"
+        ),
+        (
+            f"<p>{focus} matters because stories like this often reshape expectations before coaches, federations, and fans say so openly.</p>"
+            f"<p>For {team_or_comp or 'the wider World Cup 2026 race'}, the real impact is whether this development changes planning, confidence, or the next round of decisions linked to {primary_keyword}.</p>"
+        ),
+        (
+            f"<p>{focus} could quickly move from talking point to practical issue if the next fixtures, squad calls, or official statements reinforce the current direction.</p>"
+            f"<p>That is why {primary_keyword} is worth tracking closely now rather than waiting for a final outcome.</p>"
+        ),
+    ]
+
+    seed_text = f"{focus}|{primary_keyword}|{team_or_comp}|{source_fact}"
+    variant_index = sum(ord(ch) for ch in seed_text) % len(paragraph_options)
+    impact_block = f"<h2>{heading}</h2>{paragraph_options[variant_index]}"
 
     paragraphs = list(re.finditer(r"<p[^>]*>.*?</p>", content, re.IGNORECASE | re.DOTALL))
     if len(paragraphs) >= 2:
@@ -460,7 +545,7 @@ def _ensure_value_add_paragraph(content, primary_keyword, topic_title):
     return impact_block + content
 
 
-def _apply_seo_guards(article, primary_keyword, topic_title):
+def _apply_seo_guards(article, primary_keyword, topic_title, source_texts=None):
     primary_keyword = _derive_focus_keyword(primary_keyword, topic_title)
     if not primary_keyword:
         return article
@@ -491,8 +576,14 @@ def _apply_seo_guards(article, primary_keyword, topic_title):
     article["slug"] = slug
 
     content = article.get("content", "")
-    content = _ensure_intro_hook(content, primary_keyword, topic_title, primary_entity=primary_entity)
-    content = _ensure_value_add_paragraph(content, primary_keyword, topic_title)
+    content = _ensure_intro_hook(
+        content,
+        primary_keyword,
+        topic_title,
+        primary_entity=primary_entity,
+        source_texts=source_texts,
+    )
+    content = _ensure_value_add_paragraph(content, primary_keyword, topic_title, source_texts=source_texts)
     content = _normalize_generated_ui_blocks(content)
     content = _sanitize_dark_theme_text_colors(content)
     article["content"] = content
@@ -611,7 +702,12 @@ def generate_article(topic, source_urls=None):
     article = _parse_article_output(raw_output)
 
     if article:
-        article = _apply_seo_guards(article, topic.get("matched_keyword", ""), topic.get("topic", ""))
+        article = _apply_seo_guards(
+            article,
+            topic.get("matched_keyword", ""),
+            topic.get("topic", ""),
+            source_texts=source_texts,
+        )
         article["content"] = _remove_search_trend_talk(article.get("content", ""))
         article["full_content"] = article["content"]
         article["sources_used"] = [s.get("source_domain", "") for s in source_texts]
@@ -934,34 +1030,54 @@ def _parse_article_output(raw_text):
     """
     try:
         result = {}
+        label_order = [
+            ("TITLE", "title"),
+            ("SEO_TITLE", "seo_title"),
+            ("META_DESCRIPTION", "meta_description"),
+            ("SLUG", "slug"),
+            ("TAGS", "tags_raw"),
+            ("CATEGORY", "category"),
+        ]
+        label_map = dict(label_order)
+        metadata = {field: [] for field in label_map.values()}
+        current_field = None
+        in_content = False
 
-        # Extract TITLE
-        title_match = re.search(r'TITLE:\s*(.+?)(?:\n|SEO_TITLE:)', raw_text, re.DOTALL)
-        result["title"] = title_match.group(1).strip() if title_match else ""
+        for raw_line in raw_text.splitlines():
+            line = raw_line.rstrip()
+            stripped = line.strip()
+            if stripped == "---CONTENT_START---":
+                in_content = True
+                current_field = None
+                continue
+            if stripped == "---CONTENT_END---":
+                in_content = False
+                current_field = None
+                continue
+            if in_content:
+                continue
 
-        # Extract SEO_TITLE
-        seo_title_match = re.search(r'SEO_TITLE:\s*(.+?)(?:\n|META_DESCRIPTION:)', raw_text, re.DOTALL)
-        result["seo_title"] = seo_title_match.group(1).strip() if seo_title_match else ""
+            matched_label = False
+            for label, field_name in label_order:
+                prefix = f"{label}:"
+                if stripped.startswith(prefix):
+                    current_field = field_name
+                    metadata[field_name].append(stripped[len(prefix):].strip())
+                    matched_label = True
+                    break
+            if matched_label:
+                continue
 
-        # Extract META_DESCRIPTION
-        meta_match = re.search(r'META_DESCRIPTION:\s*(.+?)(?:\n|SLUG:)', raw_text, re.DOTALL)
-        result["meta_description"] = meta_match.group(1).strip() if meta_match else ""
+            if current_field and stripped:
+                metadata[current_field].append(stripped)
 
-        # Extract SLUG
-        slug_match = re.search(r'SLUG:\s*(.+?)(?:\n|TAGS:)', raw_text, re.DOTALL)
-        result["slug"] = slug_match.group(1).strip() if slug_match else ""
-
-        # Extract TAGS
-        tags_match = re.search(r'TAGS:\s*(.+?)(?:\n|CATEGORY:)', raw_text, re.DOTALL)
-        if tags_match:
-            tags_raw = tags_match.group(1).strip()
-            result["tags"] = [t.strip() for t in tags_raw.split(",") if t.strip()]
-        else:
-            result["tags"] = []
-
-        # Extract CATEGORY
-        cat_match = re.search(r'CATEGORY:\s*(.+?)(?:\n|---)', raw_text, re.DOTALL)
-        result["category"] = cat_match.group(1).strip() if cat_match else "News"
+        result["title"] = _normalize_whitespace(" ".join(metadata["title"]))
+        result["seo_title"] = _normalize_whitespace(" ".join(metadata["seo_title"]))
+        result["meta_description"] = _normalize_whitespace(" ".join(metadata["meta_description"]))
+        result["slug"] = _normalize_whitespace(" ".join(metadata["slug"]))
+        tags_raw = _normalize_whitespace(" ".join(metadata["tags_raw"]))
+        result["tags"] = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
+        result["category"] = _normalize_whitespace(" ".join(metadata["category"])) or "News"
 
         # Extract CONTENT
         content_match = re.search(r'---CONTENT_START---(.*?)---CONTENT_END---', raw_text, re.DOTALL)

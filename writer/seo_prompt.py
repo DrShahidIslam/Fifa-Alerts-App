@@ -85,6 +85,7 @@ ARTICLE_STRUCTURE_VARIANTS = [
             "Then include a key facts callout, then context and implications, then the important update callout, "
             "then outlook and next steps, then CTA, then FAQ."
         ),
+        "heading_style": "Use crisp utility headings that sound like a newsroom briefing.",
     },
     {
         "id": "B",
@@ -94,6 +95,7 @@ ARTICLE_STRUCTURE_VARIANTS = [
             "Move to analysis and entity relationships. Place key facts callout after timeline, "
             "then important update callout, then practical implications, then CTA, then FAQ."
         ),
+        "heading_style": "Use event-driven headings with time or sequence cues.",
     },
     {
         "id": "C",
@@ -103,6 +105,7 @@ ARTICLE_STRUCTURE_VARIANTS = [
             "Then cover confirmed facts and evidence with the key facts callout, then implications and scenarios, "
             "then important update callout, then what to watch next, then CTA, then FAQ."
         ),
+        "heading_style": "Use explanatory headings that frame cause, consequence, and pressure points.",
     },
     {
         "id": "D",
@@ -112,6 +115,27 @@ ARTICLE_STRUCTURE_VARIANTS = [
             "Then provide confirmed facts in the key facts callout, then explain schedule, teams, or travel impact, "
             "then important update callout, then strategic takeaways, then CTA, then FAQ."
         ),
+        "heading_style": "Use fan-facing service headings focused on implications and next steps.",
+    },
+    {
+        "id": "E",
+        "name": "Decision Points",
+        "instructions": (
+            "Lead with the central decision or turning point in the story. "
+            "Then move through evidence, stakeholder reaction, tournament impact, "
+            "important update callout, then next checkpoint, then CTA, then FAQ."
+        ),
+        "heading_style": "Use headings built around decisions, pressure, and what changes next.",
+    },
+    {
+        "id": "F",
+        "name": "Explainer Flow",
+        "instructions": (
+            "Open by answering the biggest fan question in plain language. "
+            "Then explain the facts, why it matters, the wider football context, "
+            "important update callout, what to watch next, then CTA, then FAQ."
+        ),
+        "heading_style": "Use explainer-style headings that answer natural reader questions.",
     },
 ]
 
@@ -533,6 +557,7 @@ STRUCTURE VARIATION (MANDATORY):
 - Variant ID: {variant['id']}
 - Variant Name: {variant['name']}
 - Variant Guide: {variant['instructions']}
+- Heading Style: {variant.get('heading_style', 'Use varied topical headings.')}
 - Keep all mandatory blocks: key facts callout, important update callout, CTA block, FAQ plus JSON-LD.
 - Use 4-6 topical sections with unique H2 headings based on the story.
 - At least one H2 must contain the main keyword or a very close natural variation.
@@ -540,6 +565,9 @@ STRUCTURE VARIATION (MANDATORY):
 - Include a standalone "Why this matters" or equivalent analysis section within the first half of the article.
 - Do not use generic headings such as "Next Section" or "Another Section".
 - Build comprehensive coverage: answer the update first, then expand with timeline, context, implications, affected teams or players, and what comes next.
+- Do not mirror the source article structure section by section.
+- Avoid these overused headings unless they are unusually precise for the story: "What happened", "Latest update", "Key takeaways", "Final thoughts".
+- Vary sentence rhythm and paragraph lengths across sections so the article does not read like a template.
 
 INTERNAL LINKING RULES (STRICT):
 - Use only genuine internal links from the list below. Do NOT invent URLs. If you hallucinate URLs that are not in this list, you will be penalized.

@@ -6,9 +6,10 @@ import logging
 import io
 import os
 import re
+import random
 from datetime import datetime
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageFilter, ImageOps, ImageStat
 from google import genai
 
 import sys
@@ -26,7 +27,106 @@ TARGET_WIDTH = 1200
 TARGET_HEIGHT = 630
 
 
-def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
+def _trim_edges(img, percent=0.035):
+    """Trim a small margin from all sides to reduce corner logos/watermarks."""
+    try:
+        if percent <= 0:
+            return img
+        margin_x = int(img.width * percent)
+        margin_y = int(img.height * percent)
+        if margin_x * 2 >= img.width or margin_y * 2 >= img.height:
+            return img
+        return img.crop((margin_x, margin_y, img.width - margin_x, img.height - margin_y))
+    except Exception:
+        return img
+
+
+def _corner_regions(img, width_ratio=0.22, height_ratio=0.18):
+    width = max(1, int(img.width * width_ratio))
+    height = max(1, int(img.height * height_ratio))
+    return {
+        "top_left": (0, 0, width, height),
+        "top_right": (img.width - width, 0, img.width, height),
+        "bottom_left": (0, img.height - height, width, img.height),
+        "bottom_right": (img.width - width, img.height - height, img.width, img.height),
+    }
+
+
+def _inner_region_for_corner(img, corner_name, width_ratio=0.22, height_ratio=0.18, inset_ratio=0.08):
+    width = max(1, int(img.width * width_ratio))
+    height = max(1, int(img.height * height_ratio))
+    inset_x = max(1, int(img.width * inset_ratio))
+    inset_y = max(1, int(img.height * inset_ratio))
+
+    if corner_name == "top_left":
+        return (inset_x, inset_y, inset_x + width, inset_y + height)
+    if corner_name == "top_right":
+        return (img.width - inset_x - width, inset_y, img.width - inset_x, inset_y + height)
+    if corner_name == "bottom_left":
+        return (inset_x, img.height - inset_y - height, inset_x + width, img.height - inset_y)
+    return (
+        img.width - inset_x - width,
+        img.height - inset_y - height,
+        img.width - inset_x,
+        img.height - inset_y,
+    )
+
+
+def _has_corner_overlay(img):
+    """Detect likely broadcaster/logo overlays near corners in source images."""
+    try:
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+
+        gray = ImageOps.grayscale(img)
+        for corner_name, box in _corner_regions(img).items():
+            patch = gray.crop(box)
+            inner_patch = gray.crop(_inner_region_for_corner(img, corner_name))
+            patch_stat = ImageStat.Stat(patch)
+            inner_stat = ImageStat.Stat(inner_patch)
+
+            mean_diff = abs(patch_stat.mean[0] - inner_stat.mean[0])
+            stddev = patch_stat.stddev[0]
+
+            # Find strong edge/detail concentration that often comes from text/logo overlays.
+            edges = patch.filter(ImageFilter.FIND_EDGES)
+            edge_mean = ImageStat.Stat(edges).mean[0]
+
+            # Count very bright and very dark pixels; overlays often cluster near extremes.
+            hist = patch.histogram()
+            total_pixels = max(1, patch.width * patch.height)
+            bright_ratio = sum(hist[230:256]) / total_pixels
+            dark_ratio = sum(hist[0:30]) / total_pixels
+
+            # Compare the corner to a blurred version to surface hard-edged overlays.
+            diff = ImageChops.difference(patch, patch.filter(ImageFilter.GaussianBlur(radius=3)))
+            diff_mean = ImageStat.Stat(diff).mean[0]
+
+            if (
+                mean_diff >= 10
+                and edge_mean >= 14
+                and diff_mean >= 6
+                and stddev >= 15
+                and (bright_ratio >= 0.08 or dark_ratio >= 0.12)
+            ):
+                logger.info(
+                    "    Rejected source image due to likely corner overlay in %s "
+                    "(mean_diff=%.1f edge_mean=%.1f diff_mean=%.1f bright=%.2f dark=%.2f)",
+                    corner_name,
+                    mean_diff,
+                    edge_mean,
+                    diff_mean,
+                    bright_ratio,
+                    dark_ratio,
+                )
+                return True
+    except Exception as e:
+        logger.warning(f"    Corner overlay scan failed: {e}")
+
+    return False
+
+
+def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE, trim_edges=False):
     """
     Compress an image to WebP format under the target file size.
     Applies resizing to 1200x630 and iteratively reduces quality until under limit.
@@ -51,6 +151,9 @@ def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
         # Convert to RGB if necessary (RGBA/palette modes don't work well with WebP lossy)
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
+
+        if trim_edges:
+            img = _trim_edges(img)
 
         # Resize to target dimensions (1200x630) maintaining aspect ratio then cropping
         img = _resize_and_crop(img, TARGET_WIDTH, TARGET_HEIGHT)
@@ -93,7 +196,7 @@ def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
         logger.error(f"    WebP compression error: {e}")
         return None
 
-def _compress_to_jpg(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
+def _compress_to_jpg(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE, trim_edges=False):
     """
     Compress an image to JPEG format under the target file size.
     Applies resizing to 1200x630 and iteratively reduces quality until under limit.
@@ -109,6 +212,8 @@ def _compress_to_jpg(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
+        if trim_edges:
+            img = _trim_edges(img)
         img = _resize_and_crop(img, TARGET_WIDTH, TARGET_HEIGHT)
 
         if not output_path.lower().endswith((".jpg", ".jpeg")):
@@ -208,18 +313,84 @@ def _try_source_image(source_url, output_path_webp, output_path_jpg):
         if not image_url:
             return None, None
         image_url = urljoin(source_url, image_url)
+        lowered_image_url = image_url.lower()
+        blocked_tokens = (
+            "logo", "logos", "branding", "brand", "watermark", "bbc", "guardian", "icon", "avatar"
+        )
+        if any(token in lowered_image_url for token in blocked_tokens):
+            logger.info(f"    Skipping likely branded source image: {image_url}")
+            return None, None
         img_r = requests.get(image_url, headers=headers, timeout=12)
         img_r.raise_for_status()
         image_bytes = img_r.content
         if len(image_bytes) < 3000:
             return None, None
-        result_webp = _compress_to_webp(image_bytes, output_path_webp)
-        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
+        img = Image.open(io.BytesIO(image_bytes))
+        if _has_corner_overlay(img):
+            return None, None
+        result_webp = _compress_to_webp(image_bytes, output_path_webp, trim_edges=True)
+        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg, trim_edges=True)
         if result_webp and result_jpg:
             logger.info(f"    Image from source article: {result_webp}, {result_jpg}")
             return result_webp, result_jpg
     except Exception as e:
         logger.warning(f"    Source image failed: {e}")
+    return None, None
+
+
+def _try_siliconflow_image(article_title, output_path_webp, output_path_jpg):
+    """Try SiliconFlow FLUX image generation. Returns (webp, jpg) or (None, None)."""
+    if not getattr(config, "USE_SILICONFLOW_IMAGE", True):
+        return None, None
+
+    api_key = getattr(config, "SILICONFLOW_API_KEY", "")
+    if not api_key:
+        return None, None
+
+    try:
+        import requests
+
+        prompt = build_image_prompt(article_title)
+        payload = {
+            "model": getattr(config, "SILICONFLOW_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell"),
+            "prompt": prompt,
+            "image_size": "1024x576",
+            "output_format": "jpeg",
+            "seed": random.randint(0, 999999999),
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        response = requests.post(
+            "https://api.siliconflow.com/v1/images/generations",
+            headers=headers,
+            json=payload,
+            timeout=90,
+        )
+        response.raise_for_status()
+        data = response.json() or {}
+        images = data.get("images") or []
+        image_url = (images[0] or {}).get("url") if images else ""
+        if not image_url:
+            return None, None
+
+        image_response = requests.get(
+            image_url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; FIFANewsAgent/1.0)"},
+            timeout=60,
+        )
+        image_response.raise_for_status()
+        image_bytes = image_response.content
+        if len(image_bytes) < 3000:
+            return None, None
+        result_webp = _compress_to_webp(image_bytes, output_path_webp)
+        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
+        if result_webp and result_jpg:
+            logger.info(f"    Images ready from SiliconFlow: {result_webp}, {result_jpg}")
+            return result_webp, result_jpg
+    except Exception as e:
+        logger.warning(f"    SiliconFlow image generation failed: {e}")
     return None, None
 
 
@@ -289,8 +460,9 @@ def _generate_placeholder_image(article_title, output_path_webp, output_path_jpg
 
 def generate_featured_image(article_title, save_dir=None, source_url=None):
     """
-    Generate a featured image. Order: Gemini Flash Image -> source article image (og:image) ->
-    Pollinations -> Imagen (if paid) -> placeholder. Compresses to WebP and JPEG under 100KB.
+    Generate a featured image. Order: Gemini Flash Image -> SiliconFlow FLUX ->
+    optional source article image (og:image) -> Pollinations -> Imagen (if paid) -> placeholder.
+    Compresses to WebP and JPEG under 100KB.
     """
     if save_dir is None:
         save_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images")
@@ -309,7 +481,13 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
         return webp, jpg
 
     # 2. Free: use image from source article (og:image or first img) — relevant and no quota
-    if source_url:
+    webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg:
+        return webp, jpg
+
+    allow_source_images = getattr(config, "ALLOW_SOURCE_ARTICLE_IMAGES", False)
+    fallback_to_source = getattr(config, "SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE", False)
+    if source_url and (allow_source_images or fallback_to_source):
         webp, jpg = _try_source_image(source_url, output_path_webp, output_path_jpg)
         if webp and jpg:
             return webp, jpg

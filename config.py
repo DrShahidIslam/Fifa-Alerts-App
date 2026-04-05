@@ -179,6 +179,11 @@ GEMINI_MODEL = "gemini-2.5-flash"
 SKIP_AI_IMAGE = os.getenv("SKIP_AI_IMAGE", "false").lower() in ("true", "1", "yes")
 # Imagen is paid-only; set True only if you have a paid Gemini plan. Free tier uses Pollinations + placeholder.
 USE_GEMINI_IMAGEN = os.getenv("USE_GEMINI_IMAGEN", "false").lower() in ("true", "1", "yes")
+ALLOW_SOURCE_ARTICLE_IMAGES = os.getenv("ALLOW_SOURCE_ARTICLE_IMAGES", "false").lower() in ("true", "1", "yes")
+SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE = os.getenv("SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE", "true").lower() in ("true", "1", "yes")
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "").strip()
+SILICONFLOW_IMAGE_MODEL = os.getenv("SILICONFLOW_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell").strip()
+USE_SILICONFLOW_IMAGE = os.getenv("USE_SILICONFLOW_IMAGE", "true").lower() in ("true", "1", "yes")
 
 # â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 LOG_FILE = "agent.log"

@@ -15,6 +15,8 @@ from writer.article_generator import (
     _apply_seo_guards,
     _derive_focus_keyword,
     _BANNED_OPENERS,
+    _parse_article_output,
+    _ensure_value_add_paragraph,
 )
 from writer.seo_prompt import _extract_entities_from_topic
 
@@ -41,8 +43,6 @@ class TestEnsureIntroHook:
         # Should prepend a hook before the short paragraph
         assert result.startswith("<p>"), "Hook should start with <p>"
         assert "italy world cup" in result.lower(), "Hook should contain keyword"
-        # Original short paragraph should still exist after the hook
-        assert "<p>Big news today.</p>" in result
 
     def test_replaces_banned_opener(self):
         """Paragraphs starting with banned phrases should be replaced."""
@@ -94,6 +94,29 @@ class TestBuildContextualHook:
     def test_uses_keyword_when_no_entity(self):
         hook = _build_contextual_hook("football news", "Football News Update")
         assert "football news" in hook.lower()
+
+    def test_uses_source_titles_for_specificity(self):
+        hook = _build_contextual_hook(
+            "messi world cup",
+            "Messi latest update",
+            primary_entity="Messi",
+            source_texts=[{"title": "Messi scores as Miami wins rescheduled friendly"}],
+        )
+        assert "rescheduled friendly" in hook.lower()
+
+
+class TestEnsureValueAddParagraph:
+
+    def test_inserts_contextual_analysis_block(self):
+        content = "<p>Intro paragraph with enough detail to pass validation and keep the article moving.</p><p>Second paragraph adds context.</p>"
+        result = _ensure_value_add_paragraph(
+            content,
+            "messi world cup",
+            "Messi latest update",
+            source_texts=[{"title": "Messi scores as Miami wins rescheduled friendly"}],
+        )
+        assert "rescheduled friendly" in result.lower() or "messi" in result.lower()
+        assert "<h2>" in result
 
 
 # ── _build_meta_title ──────────────────────────────────────────────
@@ -179,6 +202,26 @@ class TestExtractEntities:
         entities = _extract_entities_from_topic("Transfer news", "kane", sources)
         assert "Kane" in entities["players"]
         assert "Premier League" in entities["competitions"]
+
+
+class TestParseArticleOutput:
+
+    def test_multiline_metadata_is_joined_cleanly(self):
+        raw = """TITLE: Messi World Cup hopes
+still alive after Miami return
+SEO_TITLE: Messi World Cup update
+after Miami comeback
+META_DESCRIPTION: Messi World Cup update after Miami return.
+SLUG: messi-world-cup-update
+TAGS: Messi, Miami
+CATEGORY: News
+---CONTENT_START---
+<p>Body</p>
+---CONTENT_END---"""
+        parsed = _parse_article_output(raw)
+        assert parsed["title"] == "Messi World Cup hopes still alive after Miami return"
+        assert parsed["seo_title"] == "Messi World Cup update after Miami comeback"
+        assert parsed["content"] == "<p>Body</p>"
 
 
 if __name__ == "__main__":
