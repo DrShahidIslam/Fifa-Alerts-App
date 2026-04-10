@@ -696,7 +696,7 @@ def generate_article(topic, source_urls=None):
 
     except Exception as e:
         logger.error(f"  Gemini API error: {e}")
-        return None
+        raise
 
     # Step 4: Parse structured output
     article = _parse_article_output(raw_output)
@@ -720,6 +720,7 @@ def generate_article(topic, source_urls=None):
         logger.info(f"  Article generated: '{article['title']}' ({article['word_count']} words)")
     else:
         logger.error("  Failed to parse Gemini output")
+        return None
 
     return article
 

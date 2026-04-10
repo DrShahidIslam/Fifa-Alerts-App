@@ -43,20 +43,51 @@ from gemini_client import generate_content_with_fallback
 _latest_topics = []       # Most recent trending topics from last scan
 _pending_article = None   # Article awaiting approval
 _pending_image_path = None  # Featured image awaiting approval
+_deferred_article_job = None  # Previous-run article waiting for Gemini retry
 _update_offset = None     # Telegram getUpdates offset
 _gemini_quota_exhausted = False  # Set True when Gemini daily quota is hit
 _article_attempted_this_run = False  # Limit to one article generation per --once run
 
 # Pending state is considered stale after this many hours (stuck draft from cache is auto-cleared)
 PENDING_STALE_HOURS = 6
+DEFERRED_ARTICLE_STALE_HOURS = 48
+
+
+def _utc_now_iso():
+    from datetime import timezone
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_iso_utc(value):
+    if not value:
+        return None
+    try:
+        from datetime import timezone
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except Exception:
+        return None
+
+
+def _is_gemini_temporarily_unavailable(error_str):
+    upper = (error_str or "").upper()
+    return (
+        "503" in upper
+        or "500" in upper
+        or "UNAVAILABLE" in upper
+        or "DEADLINE_EXCEEDED" in upper
+        or "TIMEOUT" in upper
+    )
 
 def save_pending_state():
-    """Save pending article and image path to disk for cross-run persistence."""
-    from datetime import timezone
+    """Save pending and deferred article state to disk for cross-run persistence."""
     state = {
         "article": _pending_article,
         "image_path": _pending_image_path,
-        "saved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "deferred_article_job": _deferred_article_job,
+        "saved_at": _utc_now_iso(),
     }
     try:
         with open("pending_state.json", "w", encoding="utf-8") as f:
@@ -65,10 +96,10 @@ def save_pending_state():
         logger.error(f"Failed to save pending state: {e}")
 
 def load_pending_state():
-    """Load pending article and image path from disk. Clears if stale (stuck from old cache)."""
-    global _pending_article, _pending_image_path
-    if _pending_article:
-        return True
+    """Load pending and deferred article state from disk, clearing stale items."""
+    global _pending_article, _pending_image_path, _deferred_article_job
+    if _pending_article or _deferred_article_job:
+        return bool(_pending_article)
     try:
         if os.path.exists("pending_state.json"):
             with open("pending_state.json", "r", encoding="utf-8") as f:
@@ -84,9 +115,7 @@ def load_pending_state():
                 elif saved_at:
                     try:
                         from datetime import timezone
-                        parsed = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
-                        if parsed.tzinfo is None:
-                            parsed = parsed.replace(tzinfo=timezone.utc)
+                        parsed = _parse_iso_utc(saved_at)
                         now = datetime.now(timezone.utc)
                         age_hours = (now - parsed).total_seconds() / 3600
                         if age_hours > PENDING_STALE_HOURS:
@@ -101,9 +130,20 @@ def load_pending_state():
                     return False
             _pending_article = state.get("article")
             _pending_image_path = state.get("image_path")
+            _deferred_article_job = state.get("deferred_article_job")
             # Image file may not persist across runs (e.g. GitHub Actions); clear if missing
             if _pending_image_path and not os.path.exists(_pending_image_path):
                 _pending_image_path = None
+
+            if _deferred_article_job:
+                saved = _parse_iso_utc(_deferred_article_job.get("queued_at") or saved_at)
+                if saved:
+                    from datetime import timezone
+                    age_hours = (datetime.now(timezone.utc) - saved).total_seconds() / 3600
+                    if age_hours > DEFERRED_ARTICLE_STALE_HOURS:
+                        logger.info(f"Clearing stale deferred article retry (saved {age_hours:.0f}h ago)")
+                        _deferred_article_job = None
+                        save_pending_state()
             return bool(_pending_article)
     except Exception as e:
         logger.error(f"Failed to load pending state: {e}")
@@ -351,9 +391,126 @@ def check_and_handle_commands():
             _handle_clear_pending()
 
 
+def _clear_deferred_article_job(save=True):
+    global _deferred_article_job
+    _deferred_article_job = None
+    if save:
+        save_pending_state()
+
+
+def _queue_deferred_article_retry(topic, error_str):
+    """Persist an article request for retry on the next run without blocking new requests."""
+    global _deferred_article_job
+    attempts = int((_deferred_article_job or {}).get("attempts", 0)) + 1
+    first_queued_at = (_deferred_article_job or {}).get("first_queued_at") or _utc_now_iso()
+    _deferred_article_job = {
+        "topic": topic,
+        "attempts": attempts,
+        "first_queued_at": first_queued_at,
+        "queued_at": _utc_now_iso(),
+        "last_error": (error_str or "")[:300],
+    }
+    save_pending_state()
+
+
+def _complete_article_generation(topic, article, from_previous_run=False):
+    """Save and preview a generated article."""
+    global _pending_article
+    article["matched_keyword"] = (topic.get("matched_keyword") or topic.get("topic", "")).strip()
+    article["source_url"] = topic.get("top_url") or (topic.get("stories") or [{}])[0].get("url") or ""
+    _pending_article = article
+    if from_previous_run:
+        send_simple_message(f"🕘 Previous-run article is ready for review: {article['title']}")
+    send_article_preview(article)
+    logger.info(f"✅ Article preview sent: {article['title']}")
+    save_pending_state()
+    if not getattr(config, "SKIP_AI_IMAGE", False):
+        _generate_and_preview_image(article.get("title", ""), article.get("source_url"))
+    else:
+        send_simple_message("🖼️ Image skipped (SKIP_AI_IMAGE=enabled). You can approve the article without a featured image.")
+
+
+def _generate_article_for_topic(topic, allow_defer=False, from_previous_run=False):
+    """Generate one article, optionally queuing it for a future retry if Gemini is temporarily unavailable."""
+    global _gemini_quota_exhausted
+
+    logger.info(f"📝 Generating article for: {topic['topic']}")
+    send_generating_status(topic["topic"])
+
+    try:
+        article = generate_article(topic)
+        if article:
+            if from_previous_run:
+                _clear_deferred_article_job(save=False)
+            _complete_article_generation(topic, article, from_previous_run=from_previous_run)
+            save_pending_state()
+            return True
+
+        logger.warning("Article generator returned no article.")
+        if from_previous_run:
+            send_simple_message(f"⚠️ Previous-run article could not be parsed and was not queued again: {topic.get('topic', 'Unknown')}")
+            _clear_deferred_article_job()
+        else:
+            send_simple_message("❌ Article generation failed. Try again later.")
+        return False
+
+    except Exception as e:
+        error_str = str(e)
+        logger.error(f"Article generation error: {e}")
+
+        if allow_defer and _is_gemini_temporarily_unavailable(error_str):
+            _queue_deferred_article_retry(topic, error_str)
+            if from_previous_run:
+                send_simple_message(
+                    f"⏳ Previous-run article is still waiting on Gemini and will be retried next cycle.\nTopic: {topic.get('topic', 'Unknown')}"
+                )
+            else:
+                send_simple_message(
+                    f"⏳ Gemini is busy right now, so this article was queued for automatic retry next cycle.\nTopic: {topic.get('topic', 'Unknown')}"
+                )
+            return False
+
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            _gemini_quota_exhausted = True
+            if from_previous_run:
+                send_simple_message(
+                    f"⏸️ Previous-run article hit Gemini quota limits and will wait for a future cycle.\nTopic: {topic.get('topic', 'Unknown')}"
+                )
+            else:
+                send_simple_message("❌ Gemini API quota exhausted. No more article attempts this cycle.")
+            return False
+
+        if from_previous_run:
+            send_simple_message(
+                f"⚠️ Previous-run article failed and was removed from retry queue.\nTopic: {topic.get('topic', 'Unknown')}"
+            )
+            _clear_deferred_article_job()
+        else:
+            send_simple_message(f"❌ Error generating article: {error_str[:200]}")
+        return False
+
+
+def _retry_deferred_article_job():
+    """Retry a previous-run article request without blocking new requests in the current run."""
+    if not _deferred_article_job:
+        return False
+    if _pending_article or load_pending_state():
+        logger.info("Skipping deferred article retry because a review draft is already pending.")
+        return False
+
+    topic = (_deferred_article_job or {}).get("topic") or {}
+    if not topic:
+        logger.warning("Deferred article retry had no topic payload; clearing it.")
+        _clear_deferred_article_job()
+        return False
+
+    send_simple_message(f"🔁 Retrying article from the previous run: {topic.get('topic', 'Unknown')}")
+    return _generate_article_for_topic(topic, allow_defer=True, from_previous_run=True)
+
+
 def _handle_write_article(topic_hash=None):
     """Generate an article for a specific topic, or the most recent one if no hash provided."""
-    global _pending_article, _latest_topics, _gemini_quota_exhausted, _article_attempted_this_run
+    global _pending_article, _pending_image_path, _latest_topics, _gemini_quota_exhausted, _article_attempted_this_run
 
     # Only allow one article generation attempt per --once run
     # This prevents multiple stale callbacks from triggering repeated failures
@@ -441,35 +598,7 @@ def _handle_write_article(topic_hash=None):
 
     _article_attempted_this_run = True  # Keep for logging purposes, but no longer blocking
 
-    logger.info(f"📝 Generating article for: {topic['topic']}")
-
-    send_generating_status(topic["topic"])
-
-    try:
-        article = generate_article(topic)
-        if article:
-            article["matched_keyword"] = (topic.get("matched_keyword") or topic.get("topic", "")).strip()  # For RankMath focus keyword
-            article["source_url"] = topic.get("top_url") or (topic.get("stories") or [{}])[0].get("url") or ""
-            _pending_article = article
-            send_article_preview(article)
-            logger.info(f"✅ Article preview sent: {article['title']}")
-            save_pending_state()
-            # Auto-generate featured image unless skipped (Gemini -> source article image -> Pollinations -> placeholder)
-            if not getattr(config, "SKIP_AI_IMAGE", False):
-                _generate_and_preview_image(article.get("title", ""), article.get("source_url"))
-            else:
-                send_simple_message("🖼️ Image skipped (SKIP_AI_IMAGE=enabled). You can approve the article without a featured image.")
-        else:
-            send_simple_message("❌ Article generation failed. Try again later.")
-    except Exception as e:
-        error_str = str(e)
-        logger.error(f"Article generation error: {e}")
-        # If quota is exhausted, set the flag to prevent further attempts
-        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            _gemini_quota_exhausted = True
-            send_simple_message("❌ Gemini API quota exhausted. No more article attempts this cycle.")
-        else:
-            send_simple_message(f"❌ Error generating article: {error_str[:200]}")
+    _generate_article_for_topic(topic, allow_defer=True, from_previous_run=False)
 
 
 def _generate_and_preview_image(article_title, source_url=None):
@@ -800,6 +929,12 @@ if __name__ == "__main__":
 
         # 2. Run the scan
         alerts = run_scan()
+
+        # 2b. Retry one deferred previous-run article without consuming the fresh-request slot.
+        try:
+            _retry_deferred_article_job()
+        except Exception as e:
+            logger.error(f"Deferred article retry error: {e}")
 
         # 3. Poll for callbacks after scan — longer window so you can review & click
         #    (alerts>0: 6 min | alerts=0: 2 min — covers approve/reject on previous article)
