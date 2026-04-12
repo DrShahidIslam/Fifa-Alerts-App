@@ -10,3 +10,8 @@ test_output.txt
 test_results.log
 deploy/*.key
 fifa_agent.db
+fifa_pinterest_bot/__pycache__/
+fifa_pinterest_bot/demo_ui/__pycache__/
+fifa_pinterest_bot/*.jpg
+fifa_pinterest_bot/raw_image.png
+fifa_pinterest_bot/scratch/

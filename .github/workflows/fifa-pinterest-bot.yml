@@ -1,0 +1,40 @@
+name: FIFA Pinterest Bot (Site Linker)
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # Every 4 hours
+  workflow_dispatch:      # Allow manual runs
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-genai Pillow python-dotenv
+
+      - name: Run Bot in Site Mode
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          # Pinterest Board IDs
+          PINTEREST_BOARD_MATCH_PREVIEWS: ${{ secrets.PINTEREST_BOARD_MATCH_PREVIEWS }}
+          PINTEREST_BOARD_PLAYER_SPOTLIGHTS: ${{ secrets.PINTEREST_BOARD_PLAYER_SPOTLIGHTS }}
+          PINTEREST_BOARD_STADIUM_VENUES: ${{ secrets.PINTEREST_BOARD_STADIUM_VENUES }}
+          PINTEREST_BOARD_TRANSFER_NEWS: ${{ secrets.PINTEREST_BOARD_TRANSFER_NEWS }}
+          PINTEREST_BOARD_TACTICS: ${{ secrets.PINTEREST_BOARD_TACTICS }}
+        run: |
+          # Move into the bot directory
+          cd fifa_pinterest_bot
+          python main.py --mode site

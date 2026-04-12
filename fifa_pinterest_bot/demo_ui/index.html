@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA World Cup 2026 | Pinterest Content Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">⚽</div>
+                <h1>FIFA <span>26</span></h1>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">🔄</span> Automation
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">🍱</span> Content Studio
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">📈</span> Analytics
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">⚙️</span> Settings
+                </a>
+            </nav>
+            <div class="user-profile">
+                <div class="avatar">N</div>
+                <div class="user-info">
+                    <p class="name">Nailosmetic</p>
+                    <p class="role">Administrator</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="search-bar">
+                    <span class="icon">🔍</span>
+                    <input type="text" placeholder="Search pins, boards, or schedules...">
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">Status: Online</button>
+                    <button class="btn btn-primary" id="connect-btn">Connect Pinterest</button>
+                </div>
+            </header>
+
+            <section class="dashboard-overview">
+                <div class="summary-cards">
+                    <div class="card">
+                        <h3>Pins Published</h3>
+                        <p class="stat">1,284</p>
+                        <span class="trend up">↑ 12% this month</span>
+                    </div>
+                    <div class="card">
+                        <h3>Total Impressions</h3>
+                        <p class="stat">245.8K</p>
+                        <span class="trend up">↑ 8% this month</span>
+                    </div>
+                    <div class="card">
+                        <h3>Site Traffic (WP)</h3>
+                        <p class="stat">12.5K</p>
+                        <span class="trend up">↑ 22% from Pins</span>
+                    </div>
+                </div>
+
+                <div class="automation-panel">
+                    <div class="panel-header">
+                        <h2>FIFA Content Studio</h2>
+                        <button class="btn btn-outline" id="generate-btn">✨ Generate New Concept</button>
+                    </div>
+
+                    <div class="studio-grid">
+                        <!-- Image Preview removed as requested for demo consistency -->
+                        <!-- 
+                        <div class="preview-container card">
+                            <div class="image-preview" id="pin-preview">
+                                <div class="placeholder-content">
+                                    <div class="spinner" id="gen-spinner" style="display:none;"></div>
+                                    <p id="preview-text">Click generate to start the AI pipeline...</p>
+                                </div>
+                                <div id="overlay-text" class="overlay-title" style="display:none;"></div>
+                            </div>
+                        </div>
+                        -->
+
+                        <div class="details-container">
+                            <div class="card step" id="step-1">
+                                <div class="step-header">
+                                    <span class="step-num">1</span>
+                                    <h4>Phase 1: Brainstorming (Gemini AI)</h4>
+                                </div>
+                                <div class="step-content">
+                                    <p class="label">Generated Topic:</p>
+                                    <div class="ai-text" id="topic-text">--</div>
+                                    <p class="label">SEO Description:</p>
+                                    <div class="ai-text" id="desc-text">--</div>
+                                </div>
+                            </div>
+
+                            <div class="card step" id="step-2">
+                                <div class="step-header">
+                                    <span class="step-num">2</span>
+                                    <h4>Phase 2: Visual Concept (SiliconFlow)</h4>
+                                </div>
+                                <div class="step-content">
+                                    <p class="label">Image Model:</p>
+                                    <div class="ai-text">Kwai-Kolors/Kolors</div>
+                                    <p class="label">Prompt Status:</p>
+                                    <div class="ai-text" id="prompt-status">Waiting...</div>
+                                </div>
+                            </div>
+
+                            <div class="action-footer">
+                                <button class="btn btn-primary btn-large disabled" id="publish-btn">🚀 Publish to Pinterest Board</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals / Notifications -->
+    <div id="toast" class="toast">Pin scheduled successfully!</div>
+
+    <script src="app.js?v=1.7"></script>
+</body>
+</html>

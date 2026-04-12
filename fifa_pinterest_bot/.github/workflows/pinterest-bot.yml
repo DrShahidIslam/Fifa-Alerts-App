@@ -1,0 +1,56 @@
+# ============================================================
+# FIFA Pinterest Automation Bot — GitHub Actions Workflow
+# ============================================================
+# This workflow generates and publishes a FIFA-themed Pinterest pin
+# on a schedule. It can also be triggered manually.
+
+name: ⚽ FIFA Pinterest Pin
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  schedule:
+    # Run 6 times a day (every 4 hours) to distribute pins evenly
+    - cron: "0 */4 * * *"
+
+  # Allow manual triggering from the GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  publish-pin:
+    name: Generate & Publish FIFA Pin
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      # 3. Install dependencies
+      - name: 📦 Install dependencies
+        run: pip install -r requirements.txt
+
+      # 4. Run the bot
+      - name: ⚽ Run Pinterest Bot
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          PINTEREST_BOARD_MATCH_PREVIEWS: ${{ secrets.PINTEREST_BOARD_MATCH_PREVIEWS }}
+          PINTEREST_BOARD_PLAYER_SPOTLIGHTS: ${{ secrets.PINTEREST_BOARD_PLAYER_SPOTLIGHTS }}
+          PINTEREST_BOARD_STADIUM_VENUES: ${{ secrets.PINTEREST_BOARD_STADIUM_VENUES }}
+          PINTEREST_BOARD_TRANSFER_NEWS: ${{ secrets.PINTEREST_BOARD_TRANSFER_NEWS }}
+          PINTEREST_BOARD_TACTICS: ${{ secrets.PINTEREST_BOARD_TACTICS }}
+          PINTEREST_REFRESH_TOKEN: ${{ secrets.PINTEREST_REFRESH_TOKEN }}
+          PINTEREST_APP_ID: ${{ secrets.PINTEREST_APP_ID }}
+          PINTEREST_APP_SECRET: ${{ secrets.PINTEREST_APP_SECRET }}
+        run: python main.py
