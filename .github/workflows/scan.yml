@@ -1,9 +1,9 @@
 name: FIFA News Agent - Scan
 
 on:
-  # Run every 45 minutes (fits free tier, gives time to review alerts)
+  # Run every 4 hours
   schedule:
-    - cron: '*/45 * * * *'
+    - cron: '0 */4 * * *'
 
   # Also allow manual trigger from GitHub UI
   workflow_dispatch:
