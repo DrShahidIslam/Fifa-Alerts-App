@@ -25,6 +25,8 @@ MAX_FILE_SIZE = 100 * 1024
 # Target dimensions (1200x630 is standard OG/featured image)
 TARGET_WIDTH = 1200
 TARGET_HEIGHT = 630
+_SILICONFLOW_AUTH_CHECKED = False
+_SILICONFLOW_AUTH_OK = None
 
 
 def _trim_edges(img, percent=0.035):
@@ -124,6 +126,42 @@ def _has_corner_overlay(img):
         logger.warning(f"    Corner overlay scan failed: {e}")
 
     return False
+
+
+def _check_siliconflow_auth(api_key):
+    """Check SiliconFlow auth once per process so logs are more actionable."""
+    global _SILICONFLOW_AUTH_CHECKED, _SILICONFLOW_AUTH_OK
+
+    if _SILICONFLOW_AUTH_CHECKED:
+        return bool(_SILICONFLOW_AUTH_OK)
+
+    _SILICONFLOW_AUTH_CHECKED = True
+    _SILICONFLOW_AUTH_OK = False
+
+    if not api_key:
+        logger.info("    SiliconFlow skipped: API key missing")
+        return False
+
+    try:
+        import requests
+
+        response = requests.get(
+            getattr(config, "SILICONFLOW_USER_INFO_URL", "https://api.siliconflow.cn/v1/user/info"),
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=20,
+        )
+        if response.status_code == 200:
+            _SILICONFLOW_AUTH_OK = True
+            logger.info("    SiliconFlow auth OK")
+            return True
+        if response.status_code == 401:
+            logger.warning("    SiliconFlow skipped: API key invalid (401)")
+            return False
+        logger.warning(f"    SiliconFlow auth check returned HTTP {response.status_code}")
+        return False
+    except Exception as e:
+        logger.warning(f"    SiliconFlow auth check failed: {e}")
+        return False
 
 
 def _compress_to_webp(image_path_or_bytes, output_path, max_size=MAX_FILE_SIZE, trim_edges=False):
@@ -339,12 +377,13 @@ def _try_source_image(source_url, output_path_webp, output_path_jpg):
 
 
 def _try_siliconflow_image(article_title, output_path_webp, output_path_jpg):
-    """Try SiliconFlow FLUX image generation. Returns (webp, jpg) or (None, None)."""
+    """Try SiliconFlow image generation using the same API shape as the working Pinterest app."""
     if not getattr(config, "USE_SILICONFLOW_IMAGE", True):
+        logger.info("    SiliconFlow skipped: disabled by config")
         return None, None
 
     api_key = getattr(config, "SILICONFLOW_API_KEY", "")
-    if not api_key:
+    if not _check_siliconflow_auth(api_key):
         return None, None
 
     try:
@@ -352,18 +391,21 @@ def _try_siliconflow_image(article_title, output_path_webp, output_path_jpg):
 
         prompt = build_image_prompt(article_title)
         payload = {
-            "model": getattr(config, "SILICONFLOW_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell"),
-            "prompt": prompt,
+            "model": getattr(config, "SILICONFLOW_IMAGE_MODEL", "Kwai-Kolors/Kolors"),
+            "prompt": (
+                f"{prompt}, highly detailed, masterpiece, best quality, "
+                "professional sports journalism, photorealistic"
+            ),
+            "negative_prompt": getattr(config, "SILICONFLOW_NEGATIVE_PROMPT", ""),
             "image_size": "1024x576",
-            "output_format": "jpeg",
-            "seed": random.randint(0, 999999999),
+            "batch_size": 1,
         }
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         response = requests.post(
-            "https://api.siliconflow.com/v1/images/generations",
+            getattr(config, "SILICONFLOW_API_URL", "https://api.siliconflow.cn/v1/images/generations"),
             headers=headers,
             json=payload,
             timeout=90,

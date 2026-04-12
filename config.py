@@ -182,7 +182,15 @@ USE_GEMINI_IMAGEN = os.getenv("USE_GEMINI_IMAGEN", "false").lower() in ("true", 
 ALLOW_SOURCE_ARTICLE_IMAGES = os.getenv("ALLOW_SOURCE_ARTICLE_IMAGES", "false").lower() in ("true", "1", "yes")
 SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE = os.getenv("SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE", "true").lower() in ("true", "1", "yes")
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "").strip()
-SILICONFLOW_IMAGE_MODEL = os.getenv("SILICONFLOW_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell").strip()
+SILICONFLOW_API_URL = os.getenv("SILICONFLOW_API_URL", "https://api.siliconflow.cn/v1/images/generations").strip()
+SILICONFLOW_USER_INFO_URL = os.getenv("SILICONFLOW_USER_INFO_URL", "https://api.siliconflow.cn/v1/user/info").strip()
+SILICONFLOW_IMAGE_MODEL = os.getenv("SILICONFLOW_IMAGE_MODEL", "Kwai-Kolors/Kolors").strip()
+SILICONFLOW_NEGATIVE_PROMPT = os.getenv(
+    "SILICONFLOW_NEGATIVE_PROMPT",
+    "mutated hands, poorly drawn hands, extra fingers, missing fingers, malformed hands, "
+    "deformed fingers, unnatural hands, bad anatomy, bad proportions, disfigured, blurry, "
+    "worst quality, low quality",
+).strip()
 USE_SILICONFLOW_IMAGE = os.getenv("USE_SILICONFLOW_IMAGE", "true").lower() in ("true", "1", "yes")
 
 # â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -139,6 +139,12 @@ class TestBuildMetaTitle:
         result = _build_meta_title("Italy World Cup", "italy world cup", article_title="Italy World Cup")
         assert result.lower() != "italy world cup"
 
+    def test_meta_title_is_complete_and_not_broken(self):
+        result = _build_meta_title("Breaking", "world cup 2026", article_title="Argentina: World Cup 2026")
+        assert "world cup 2026" in result.lower()
+        assert not result.endswith(":")
+        assert len(result) <= 60
+
 
 # ── _build_meta_description ────────────────────────────────────────
 
@@ -169,6 +175,18 @@ class TestBuildMetaDescription:
             primary_entity="Argentina",
         )
         assert result.lower().count("argentina") == 1
+
+    def test_description_is_complete_and_target_length(self):
+        result = _build_meta_description(
+            "Latest update",
+            "world cup 2026",
+            primary_entity="Argentina",
+            article_title="Argentina: World Cup 2026",
+        )
+        assert "world cup 2026" in result.lower()
+        assert "argentina" in result.lower()
+        assert result[-1] in ".!?"
+        assert 145 <= len(result) <= 155
 
 
 # ── _extract_entities_from_topic ───────────────────────────────────

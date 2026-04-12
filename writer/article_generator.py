@@ -105,6 +105,89 @@ def _trim_to_limit(text, limit):
     return trimmed.rstrip(" ,:;.-")
 
 
+def _ensure_terminal_punctuation(text, punctuation="."):
+    text = _normalize_whitespace(text).rstrip(" ,:;-/|")
+    if not text:
+        return ""
+    if text[-1] not in ".!?":
+        text = f"{text}{punctuation}"
+    return text
+
+
+def _clean_fragment(text):
+    text = _normalize_whitespace(text)
+    text = re.sub(r"^[\-\|\:,;.!?\s]+", "", text)
+    text = re.sub(r"[\-\|\:,;\s]+$", "", text)
+    return text
+
+
+def _entity_from_title(article_title, primary_keyword):
+    title = _clean_fragment(article_title)
+    keyword = _clean_fragment(primary_keyword)
+    if not title:
+        return ""
+    if keyword and title.lower() == keyword.lower():
+        return ""
+    if ":" in title:
+        lead = _clean_fragment(title.split(":", 1)[0])
+        if lead and lead.lower() != keyword.lower():
+            return lead
+    words = title.split()
+    if 1 < len(words) <= 5 and title.lower() != keyword.lower():
+        return title
+    return ""
+
+
+def _build_meta_title_candidate(primary_keyword, article_title="", seo_title=""):
+    keyword = _clean_fragment(primary_keyword)
+    article = _clean_fragment(article_title)
+    seo = _clean_fragment(seo_title)
+    entity = _entity_from_title(article, keyword)
+
+    candidates = []
+    if entity and keyword and entity.lower() != keyword.lower():
+        candidates.extend([
+            f"{keyword}: {entity} latest update",
+            f"{keyword}: {entity} news",
+        ])
+    if keyword:
+        candidates.extend([
+            f"{keyword}: latest update",
+            f"{keyword}: key facts and latest news",
+            f"{keyword} latest news",
+        ])
+    if seo:
+        candidates.append(seo if _contains_keyword(seo, keyword) else f"{keyword}: {seo}")
+    if article and article.lower() != keyword.lower():
+        candidates.append(article if _contains_keyword(article, keyword) else f"{keyword}: {article}")
+    return [candidate for candidate in candidates if candidate]
+
+
+def _build_meta_description_candidate(primary_keyword, primary_entity="", article_title="", meta_description=""):
+    keyword = _clean_fragment(primary_keyword)
+    entity = _clean_fragment(primary_entity) or _entity_from_title(article_title, keyword)
+    meta = _clean_fragment(meta_description)
+
+    candidates = []
+    if meta:
+        base = meta if _contains_keyword(meta, keyword) else f"{keyword}: {meta}"
+        if entity and not _contains_keyword(base, entity):
+            base = f"{base.rstrip('.! ')} involving {entity}"
+        candidates.append(base)
+
+    if keyword and entity and entity.lower() != keyword.lower():
+        candidates.extend([
+            f"Track the latest {keyword} update as {entity} drives the biggest talking point, with confirmed facts, context, and what happens next.",
+            f"Follow the latest {keyword} news around {entity}, including confirmed developments, key context, and what to watch next.",
+        ])
+    if keyword:
+        candidates.extend([
+            f"Get the latest {keyword} update with confirmed facts, key context, and what to watch next as the story develops.",
+            f"Discover the latest {keyword} news, including confirmed facts, key context, and the next major development to watch.",
+        ])
+    return [candidate for candidate in candidates if candidate]
+
+
 def _contains_keyword(text, keyword):
     return bool(keyword and text and keyword.lower() in text.lower())
 
@@ -350,28 +433,53 @@ def _discover_additional_source_urls(topic, existing_urls=None, source_texts=Non
 
 
 def _build_meta_title(seo_title, primary_keyword, article_title=""):
-    seo_title = _normalize_whitespace(seo_title)
-    if not _contains_keyword(seo_title, primary_keyword):
-        seo_title = f"{primary_keyword}: {seo_title}" if seo_title else primary_keyword
-    if article_title and seo_title.lower() == _normalize_whitespace(article_title).lower():
-        seo_title = f"{primary_keyword}: impact and latest update"
-    return _trim_to_limit(seo_title, 60)
+    for candidate in _build_meta_title_candidate(primary_keyword, article_title=article_title, seo_title=seo_title):
+        candidate = _clean_fragment(candidate)
+        if not candidate:
+            continue
+        if not _contains_keyword(candidate, primary_keyword):
+            continue
+        candidate = _trim_to_limit(candidate, 60)
+        if candidate and candidate.lower() != _normalize_whitespace(article_title).lower():
+            return _clean_fragment(candidate)
+    return _trim_to_limit(_clean_fragment(primary_keyword), 60)
 
 
-def _build_meta_description(meta_description, primary_keyword, primary_entity=""):
-    meta = _normalize_whitespace(meta_description)
-    if not meta:
-        entity_fragment = f" for {primary_entity}" if primary_entity and primary_entity.lower() != primary_keyword.lower() else ""
-        meta = f"Get the latest on {primary_keyword}{entity_fragment}: confirmed facts, impact analysis, and what comes next."
-    elif not _contains_keyword(meta, primary_keyword):
-        meta = f"{primary_keyword}: {meta}"
-    # Ensure entity presence for AEO
-    if primary_entity and not _contains_keyword(meta, primary_entity):
-        meta = meta.rstrip(".! ") + f" involving {primary_entity}."
-    meta = _trim_to_limit(meta, 155)
-    if len(meta) < 145:
-        meta = _trim_to_limit(f"{meta} Key facts, timeline, and what to watch next.", 155)
-    return meta
+def _build_meta_description(meta_description, primary_keyword, primary_entity="", article_title=""):
+    candidates = _build_meta_description_candidate(
+        primary_keyword,
+        primary_entity=primary_entity,
+        article_title=article_title,
+        meta_description=meta_description,
+    )
+
+    best = ""
+    for candidate in candidates:
+        candidate = _ensure_terminal_punctuation(candidate)
+        if not _contains_keyword(candidate, primary_keyword):
+            continue
+        if primary_entity and not _contains_keyword(candidate, primary_entity):
+            continue
+        candidate = _trim_to_limit(candidate, 155)
+        candidate = _ensure_terminal_punctuation(candidate)
+        if len(candidate) >= 145:
+            return candidate
+        if len(candidate) > len(best):
+            best = candidate
+
+    if best:
+        filler = " Latest facts, analysis, and next steps."
+        while len(best) < 145 and filler:
+            expanded = _trim_to_limit(f"{best.rstrip('.! ')}.{filler}", 155)
+            expanded = _ensure_terminal_punctuation(expanded)
+            if len(expanded) <= len(best):
+                break
+            best = expanded
+            filler = ""
+        return best
+
+    fallback = _ensure_terminal_punctuation(f"Get the latest {primary_keyword} update with confirmed facts and what to watch next")
+    return _trim_to_limit(fallback, 155)
 
 
 def _strip_html_tags(value):
@@ -553,7 +661,7 @@ def _apply_seo_guards(article, primary_keyword, topic_title, source_texts=None):
     article["focus_keyword"] = primary_keyword
 
     # Extract entities for use in meta and intro guards
-    entities = _extract_entities_from_topic(topic_title, primary_keyword)
+    entities = _extract_entities_from_topic(topic_title, primary_keyword, source_texts)
     primary_entity = entities.get("primary_entity", "")
 
     title = _build_article_title(
@@ -567,7 +675,10 @@ def _apply_seo_guards(article, primary_keyword, topic_title, source_texts=None):
     article["seo_title"] = _build_meta_title(seo_title, primary_keyword, article_title=article["title"])
 
     article["meta_description"] = _build_meta_description(
-        article.get("meta_description"), primary_keyword, primary_entity=primary_entity
+        article.get("meta_description"),
+        primary_keyword,
+        primary_entity=primary_entity,
+        article_title=article["title"],
     )
 
     slug = _sanitize_slug(article.get("slug"))
