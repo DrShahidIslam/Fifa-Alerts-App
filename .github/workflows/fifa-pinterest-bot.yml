@@ -1,9 +1,10 @@
 name: FIFA Pinterest Bot (Site Linker)
 
 on:
-  schedule:
-    - cron: '0 */4 * * *'  # Every 4 hours
-  workflow_dispatch:      # Allow manual runs
+  # DISABLED: Re-enable once Pinterest Standard Access is approved
+  # schedule:
+  #   - cron: '0 */4 * * *'  # Every 4 hours
+  workflow_dispatch:      # Manual runs only for now
 
 jobs:
   run-bot:
