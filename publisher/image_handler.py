@@ -352,10 +352,11 @@ def _try_source_image(source_url, output_path_webp, output_path_jpg):
             return None, None
         image_url = urljoin(source_url, image_url)
         lowered_image_url = image_url.lower()
+        lowered_source_url = source_url.lower()
         blocked_tokens = (
-            "logo", "logos", "branding", "brand", "watermark", "bbc", "guardian", "icon", "avatar"
+            "logo", "logos", "branding", "brand", "watermark", "bbc", "guardian", "icon", "avatar", "sky", "espn"
         )
-        if any(token in lowered_image_url for token in blocked_tokens):
+        if any(token in lowered_image_url or token in lowered_source_url for token in blocked_tokens):
             logger.info(f"    Skipping likely branded source image: {image_url}")
             return None, None
         img_r = requests.get(image_url, headers=headers, timeout=12)
@@ -498,6 +499,25 @@ def _generate_placeholder_image(article_title, output_path_webp, output_path_jpg
     except Exception as e:
         logger.error(f"    Placeholder image error: {e}")
         return None, None
+
+
+def generate_inline_image(article_title, save_dir=None):
+    """
+    Generate a secondary inline image using Kolors API (SiliconFlow) exclusively.
+    Returns the WebP and JPG paths.
+    """
+    if save_dir is None:
+        save_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images")
+    os.makedirs(save_dir, exist_ok=True)
+
+    slug = re.sub(r"[^a-z0-9]+", "-", article_title.lower())[:30].strip("-")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path_webp = os.path.join(save_dir, f"inline_{slug}_{timestamp}.webp")
+    output_path_jpg = os.path.join(save_dir, f"inline_{slug}_{timestamp}.jpg")
+
+    logger.info(f"  Generating Kolors inline image for: {article_title[:60]}")
+    webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
+    return webp, jpg
 
 
 def generate_featured_image(article_title, save_dir=None, source_url=None):

@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import time
+import random
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse, urlunparse
 
@@ -136,6 +137,46 @@ ARTICLE_STRUCTURE_VARIANTS = [
             "important update callout, what to watch next, then CTA, then FAQ."
         ),
         "heading_style": "Use explainer-style headings that answer natural reader questions.",
+    },
+    {
+        "id": "G",
+        "name": "Data and Stats First",
+        "instructions": (
+            "Begin with the most shocking or important statistic/number related to the story. "
+            "Then break down what the numbers mean with the key facts callout, follow with historical context, "
+            "then important update callout, then predictions, then CTA, then FAQ."
+        ),
+        "heading_style": "Use data-driven, analytical headings.",
+    },
+    {
+        "id": "H",
+        "name": "The Contrarian Angle",
+        "instructions": (
+            "Open by challenging the conventional wisdom or most popular fan reaction to the news. "
+            "Then provide the key facts callout, explain the alternative perspective, "
+            "then important update callout, then the likely reality, then CTA, then FAQ."
+        ),
+        "heading_style": "Use thought-provoking, debate-style headings.",
+    },
+    {
+        "id": "I",
+        "name": "Historical Deep Dive",
+        "instructions": (
+            "Start by connecting today's news to a memorable past World Cup event or legacy. "
+            "Then drop the key facts callout with today's details, explain the evolution, "
+            "then important update callout, then future legacy impact, then CTA, then FAQ."
+        ),
+        "heading_style": "Use contextual, legacy-focused headings.",
+    },
+    {
+        "id": "J",
+        "name": "Tactical Breakdown",
+        "instructions": (
+            "Lead directly into the on-pitch or strategic implications of the news. "
+            "Then list confirmed details in the key facts callout, explain the tactical shifts or rule impacts, "
+            "then important update callout, then coach/player impact, then CTA, then FAQ."
+        ),
+        "heading_style": "Use technical, strategy-focused headings.",
     },
 ]
 
@@ -401,10 +442,8 @@ def _extract_entities_from_topic(topic_title, matched_keyword, source_texts=None
 
 
 def _select_article_variant(topic_title, matched_keyword):
-    """Pick a deterministic structure variant by topic."""
-    seed = f"{topic_title}|{matched_keyword}".encode("utf-8")
-    idx = int(hashlib.sha256(seed).hexdigest(), 16) % len(ARTICLE_STRUCTURE_VARIANTS)
-    return ARTICLE_STRUCTURE_VARIANTS[idx]
+    """Pick a completely random structure variant to ensure zero algorithmic footprint per article."""
+    return random.choice(ARTICLE_STRUCTURE_VARIANTS)
 
 
 def build_article_prompt(topic_title, source_texts, matched_keyword="", keyword_strategy=None):
@@ -487,9 +526,9 @@ SUPPORTING KEYWORDS: {supporting_keywords}
    a) Treat the PRIMARY KEYWORD as the lead search target.
    b) Use SECONDARY KEYWORDS only where they genuinely improve topical coverage.
    c) Use SUPPORTING KEYWORDS to deepen context, FAQs, and entity relationships. Do not stuff them.
-2) MAIN TITLE: Keep the visible article title compact and editorial, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). Do not stack multiple clauses or repeat the same keyword.
-3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and MUST be strictly under 60 characters to avoid truncation.
-4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It MUST be strictly between 145 and 155 characters to avoid truncation and fit perfectly within search snippets. Use an action verb plus curiosity gap.
+2) MAIN TITLE: Keep the visible article title compact, editorial, and natural, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). Do not stack multiple clauses, repeat the same keyword, or break words awkwardly to hit length limits.
+3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and should ideally be under 60 characters, but prioritize natural, grammatical phrasing over strict word-breaking.
+4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It should ideally be between 140 and 155 characters. Prioritize a natural sentence structure over strict character counts that break words. Use an action verb plus curiosity gap.
 5) FIRST PARAGRAPH — CRITICAL (this is the most important paragraph for user engagement and SEO):
    a) Must be 25-45 words: enough to be substantive, short enough to be punchy.
    b) Must directly answer the core search intent behind the topic in the very first sentence.
@@ -524,11 +563,11 @@ SUPPORTING KEYWORDS: {supporting_keywords}
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: Visible on-page headline. Natural, editorial, compact, and usually 45-70 characters. Include a hook, the exact main keyword, and one supporting keyword or entity if it fits naturally.
-2. SEO_TITLE: Separate meta title for search results. MUST be under 60 chars (to prevent truncation), and includes the exact main keyword.
-3. META_DESCRIPTION: 145-155 chars (no more, no less), includes the exact main keyword AND the primary entity name, and uses a compelling action-oriented hook.
+1. TITLE: Visible on-page headline. Natural, editorial, compact, and usually 45-70 characters. Include a hook, the main keyword naturally, and an entity if it fits. Ensure sentences read fluently and no words are broken.
+2. SEO_TITLE: Separate meta title for search results. Keep it naturally under 60 characters without breaking words, and include the exact main keyword.
+3. META_DESCRIPTION: Between 140-155 characters. Prioritize readable, full sentences over strict length limits that break words. Include the exact main keyword and primary entity name.
 4. SLUG: extremely short, punchy, keyword-rich, lowercase, hyphens only, and based on the main keyword.
-5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2.
+5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2. Include the exact placeholder text `%%INLINE_IMAGE%%` on its own line between paragraphs somewhere in the middle of the article body. This is critical for our image insertion.
 6. FAQ: 3-4 schema-ready questions.
 
 RULES:

@@ -35,8 +35,7 @@ from database.db import get_connection, cleanup_old_data, mark_notified, record_
 from writer.article_generator import generate_article
 from publisher.wordpress_client import create_post
 from writer.seo_prompt import append_to_dynamic_links_cache
-
-from publisher.image_handler import generate_featured_image
+from publisher.image_handler import generate_featured_image, generate_inline_image
 from gemini_client import generate_content_with_fallback
 
 # ── Global state for command handler ──────────────────────────────────
@@ -603,22 +602,29 @@ def _handle_write_article(topic_hash=None):
 
 def _generate_and_preview_image(article_title, source_url=None):
     """Generate a featured image and send it to Telegram for approval."""
-    global _pending_image_path
+    global _pending_image_path, _pending_article
 
     if not article_title:
         return
 
-    send_simple_message("🎨 Generating featured image... This may take a moment.")
+    send_simple_message("🎨 Generating featured and inline images... This may take a moment.")
 
     try:
         webp_path, jpg_path = generate_featured_image(article_title, source_url=source_url)
         if webp_path and jpg_path:
             _pending_image_path = webp_path  # We use WebP for WordPress uploading
-            save_pending_state()
             send_image_preview(jpg_path, article_title) # We use JPG for Telegram
             logger.info(f"🖼️ Image preview sent (Telegram: {jpg_path}, WP: {webp_path})")
         else:
-            send_simple_message("⚠️ Image generation failed. Article can still be published without an image.")
+            send_simple_message("⚠️ Featured image generation failed. Article can still be published without an image.")
+
+        if _pending_article:
+            inline_webp, inline_jpg = generate_inline_image(article_title)
+            if inline_webp:
+                _pending_article["inline_image_path"] = inline_webp
+                logger.info(f"🖼️ Inline image generated for WP: {inline_webp}")
+        
+        save_pending_state()
     except Exception as e:
         logger.error(f"Image generation error: {e}")
         send_simple_message(f"⚠️ Image generation failed: {str(e)[:200]}. Article can still be published without an image.")

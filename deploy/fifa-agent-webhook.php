@@ -165,6 +165,48 @@ if (!empty($data['featured_image_base64']) && !empty($data['featured_image_filen
     }
 }
 
+// Inline image from base64
+$inline_id = 0;
+if (!empty($data['inline_image_base64']) && !empty($data['inline_image_filename'])) {
+    $filename = sanitize_file_name(basename($data['inline_image_filename']));
+    $mime = 'image/webp';
+    if (preg_match('/\.(jpe?g|png)$/i', $filename)) {
+        $mime = 'image/jpeg';
+        if (preg_match('/\.png$/i', $filename))
+            $mime = 'image/png';
+    }
+    $bytes = base64_decode($data['inline_image_base64'], true);
+    if ($bytes !== false && strlen($bytes) > 0) {
+        $upload = wp_upload_bits($filename, null, $bytes);
+        if (empty($upload['error']) && !empty($upload['file'])) {
+            $file_path = $upload['file'];
+            $attachment = [
+                'post_mime_type' => $upload['type'],
+                'post_title' => $title . " image",
+                'post_content' => '',
+                'post_status' => 'inherit',
+            ];
+            $attach_id = wp_insert_attachment($attachment, $file_path);
+            if (!is_wp_error($attach_id)) {
+                require_once ABSPATH . 'wp-admin/includes/image.php';
+                wp_generate_attachment_metadata($attach_id, $file_path);
+                $inline_id = (int) $attach_id;
+
+                // Set the alt text for the inline image
+                $alt_text = isset($data['inline_image_alt']) ? sanitize_text_field($data['inline_image_alt']) : $title;
+                update_post_meta($inline_id, '_wp_attachment_image_alt', $alt_text);
+
+                // Replace the placeholder in the content with the actual image tag
+                $image_url = wp_get_attachment_url($inline_id);
+                $img_tag = '<figure class="wp-block-image aligncenter size-large"><img src="' . esc_url($image_url) . '" alt="' . esc_attr($alt_text) . '" title="' . esc_attr($alt_text) . '" /></figure>';
+                $content = str_replace('%%INLINE_IMAGE%%', $img_tag, $content);
+            }
+        }
+    }
+}
+// Clean up any remaining placeholder if generation failed
+$content = str_replace('%%INLINE_IMAGE%%', '', $content);
+
 $post_arr = [
     'post_title' => $title,
     'post_content' => $content,

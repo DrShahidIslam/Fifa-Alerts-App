@@ -98,9 +98,9 @@ def _trim_to_limit(text, limit):
     text = _normalize_whitespace(text)
     if len(text) <= limit:
         return text
-    trimmed = text[: limit - 1].rstrip(" ,:;.-")
+    trimmed = text[:limit]
     cut = trimmed.rfind(" ")
-    if cut > int(limit * 0.6):
+    if cut > 0:
         trimmed = trimmed[:cut]
     return trimmed.rstrip(" ,:;.-")
 
@@ -145,21 +145,23 @@ def _build_meta_title_candidate(primary_keyword, article_title="", seo_title="")
     entity = _entity_from_title(article, keyword)
 
     candidates = []
-    if entity and keyword and entity.lower() != keyword.lower():
-        candidates.extend([
-            f"{keyword}: {entity} latest update",
-            f"{keyword}: {entity} news",
-        ])
-    if keyword:
-        candidates.extend([
-            f"{keyword}: latest update",
-            f"{keyword}: key facts and latest news",
-            f"{keyword} latest news",
-        ])
     if seo:
         candidates.append(seo if _contains_keyword(seo, keyword) else f"{keyword}: {seo}")
     if article and article.lower() != keyword.lower():
         candidates.append(article if _contains_keyword(article, keyword) else f"{keyword}: {article}")
+
+    if entity and keyword and entity.lower() != keyword.lower():
+        candidates.extend([
+            f"{keyword}: {entity} news & updates",
+            f"{keyword}: What's next for {entity}",
+            f"Latest {keyword} news: {entity}"
+        ])
+    if keyword:
+        candidates.extend([
+            f"{keyword}: Breaking news & updates",
+            f"Latest {keyword} update and context",
+            f"{keyword}: Everything you need to know"
+        ])
     return [candidate for candidate in candidates if candidate]
 
 
@@ -177,13 +179,13 @@ def _build_meta_description_candidate(primary_keyword, primary_entity="", articl
 
     if keyword and entity and entity.lower() != keyword.lower():
         candidates.extend([
-            f"Track the latest {keyword} update as {entity} drives the biggest talking point, with confirmed facts, context, and what happens next.",
-            f"Follow the latest {keyword} news around {entity}, including confirmed developments, key context, and what to watch next.",
+            f"Stay updated on the latest {keyword} news as {entity} takes center stage. Get confirmed facts, essential context, and see what happens next.",
+            f"Follow the breaking {keyword} story involving {entity}. We break down the key facts, impact, and the next major developments to watch.",
         ])
     if keyword:
         candidates.extend([
-            f"Get the latest {keyword} update with confirmed facts, key context, and what to watch next as the story develops.",
-            f"Discover the latest {keyword} news, including confirmed facts, key context, and the next major development to watch.",
+            f"Get the latest {keyword} updates. Read confirmed facts, understand the context, and find out what to watch for as this story develops.",
+            f"Your complete guide to the latest {keyword} news. Discover the essential facts, the underlying context, and what you need to know next.",
         ])
     return [candidate for candidate in candidates if candidate]
 

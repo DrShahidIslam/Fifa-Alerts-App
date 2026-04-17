@@ -245,6 +245,13 @@ def _publish_via_webhook(article, featured_image_path=None, status=None):
             payload["featured_image_base64"] = base64.b64encode(f.read()).decode("ascii")
         payload["featured_image_filename"] = os.path.basename(featured_image_path)
         payload["featured_image_alt"] = article.get("title", "")
+        
+    inline_image_path = article.get("inline_image_path")
+    if inline_image_path and os.path.exists(inline_image_path):
+        with open(inline_image_path, "rb") as f:
+            payload["inline_image_base64"] = base64.b64encode(f.read()).decode("ascii")
+        payload["inline_image_filename"] = os.path.basename(inline_image_path)
+        payload["inline_image_alt"] = article.get("title", "") + " photo"
 
     for attempt in range(3):
         headers = HEADERS.copy()
