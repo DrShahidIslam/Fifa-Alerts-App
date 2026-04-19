@@ -36,6 +36,8 @@ load_dotenv()  # Load .env file if present (local development)
 raw_gemini_keys = os.getenv("GEMINI_API_KEYS", "") or os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_KEYS = [k.strip() for k in raw_gemini_keys.split(",") if k.strip()]
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
+HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 PINTEREST_ACCESS_TOKEN = os.getenv("PINTEREST_ACCESS_TOKEN")
 PINTEREST_REFRESH_TOKEN = os.getenv("PINTEREST_REFRESH_TOKEN")
 PINTEREST_APP_ID = os.getenv("PINTEREST_APP_ID")
@@ -74,8 +76,11 @@ BOARD_MAP = {
 DEFAULT_BOARD_CATEGORY = "ultimate_guide"
 
 # SiliconFlow API config
+# Image Generation settings
 SILICONFLOW_API_URL = "https://api.siliconflow.cn/v1/images/generations"
 SILICONFLOW_MODEL = "Kwai-Kolors/Kolors"
+HUGGING_FACE_API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+TOGETHER_API_URL = "https://api.together.xyz/v1/images/generations"
 
 # Pinterest API base (Sandbox mode for Trial access)
 PINTEREST_API_BASE = "https://api-sandbox.pinterest.com/v5"
@@ -85,7 +90,7 @@ def validate_env_vars():
     """Ensure all required environment variables are set."""
     required = {
         "GEMINI_API_KEYS": True if GEMINI_API_KEYS else False,
-        "SILICONFLOW_API_KEY": SILICONFLOW_API_KEY,
+        "IMAGE_KEY_PRESENT": bool(SILICONFLOW_API_KEY or HUGGING_FACE_TOKEN),
         "PINTEREST_ACCESS_TOKEN": PINTEREST_ACCESS_TOKEN,
     }
     missing = [k for k, v in required.items() if not v]
@@ -200,24 +205,107 @@ Available Categories:
 # PHASE 2 & 3: IMAGE & DESIGN (Unchanged logic)
 # ============================================================================
 
-def generate_image_with_siliconflow(image_prompt: str, output_dir: str):
-    print("\nPhase 2: Generating image with SiliconFlow...")
-    headers = {"Authorization": f"Bearer {SILICONFLOW_API_KEY}", "Content-Type": "application/json"}
-    payload = {
-        "model": SILICONFLOW_MODEL,
-        "prompt": image_prompt + ", masterpiece, cinematic lighting, 8k",
-        "image_size": "768x1024",
-        "batch_size": 1
-    }
-    response = requests.post(SILICONFLOW_API_URL, headers=headers, json=payload, timeout=60)
-    result = response.json()
-    image_url = result["images"][0]["url"]
+def _try_hf_image(prompt, output_dir):
+    token = os.getenv("HUGGING_FACE_TOKEN")
+    if not token: 
+        return None
+    print("   Trying Hugging Face (FLUX)...")
+    try:
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        payload = {"inputs": prompt + ", professional sports photograph, cinematic lighting, vertical aspect ratio"}
+        r = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload, timeout=90)
+        
+        if r.status_code == 503:
+            print("   Model loading (503), waiting 10s...")
+            time.sleep(10)
+            r = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload, timeout=90)
+
+        r.raise_for_status()
+        raw_path = os.path.join(output_dir, "raw_hf.png")
+        with open(raw_path, "wb") as f:
+            f.write(r.content)
+        return raw_path
+    except Exception as e:
+        print(f"   HF Failed: {e}")
+        return None
+
+def _try_together_image(prompt, output_dir):
+    api_key = os.getenv("TOGETHER_API_KEY")
+    if not api_key: return None
+    print("   Trying Together AI (FLUX)...")
+    try:
+        payload = {
+            "model": "black-forest-labs/FLUX.1-schnell",
+            "prompt": prompt,
+            "width": 768, "height": 1024, "n": 1, "response_format": "b64_json"
+        }
+        headers = {"Authorization": f"Bearer {api_key}"}
+        r = requests.post(TOGETHER_API_URL, headers=headers, json=payload, timeout=60)
+        r.raise_for_status()
+        b64_data = r.json().get("data", [{}])[0].get("b64_json")
+        if b64_data:
+            raw_path = os.path.join(output_dir, "raw_together.png")
+            with open(raw_path, "wb") as f:
+                f.write(base64.b64decode(b64_data))
+            return raw_path
+    except Exception as e:
+        print(f"   Together Failed: {e}")
+    return None
+
+def _try_pollinations_image(prompt, output_dir):
+    print("   Trying Pollinations (Free)...")
+    try:
+        import urllib.parse
+        safe_prompt = urllib.parse.quote(prompt + ", realistic sports photography, vertical")
+        seed = int(time.time() * 1000) % 1000000
+        url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=768&height=1024&seed={seed}&nologo=true&model=flux"
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        raw_path = os.path.join(output_dir, "raw_pollinations.png")
+        with open(raw_path, "wb") as f:
+            f.write(r.content)
+        return raw_path
+    except Exception as e:
+        print(f"   Pollinations Failed: {e}")
+        return None
+
+def generate_bot_image(image_prompt: str, output_dir: str):
+    """Hierarchical image generation for the bot."""
+    print(f"\nPhase 2: Generating image...")
     
-    img_response = requests.get(image_url)
-    raw_path = os.path.join(output_dir, "raw_image.png")
-    with open(raw_path, "wb") as f:
-        f.write(img_response.content)
-    return raw_path, image_url
+    # 1. Hugging Face
+    path = _try_hf_image(image_prompt, output_dir)
+    if path: return path
+    
+    # 2. Together AI
+    path = _try_together_image(image_prompt, output_dir)
+    if path: return path
+    
+    # 3. SiliconFlow (Original)
+    api_key = os.getenv("SILICONFLOW_API_KEY")
+    if api_key:
+        print("   Trying SiliconFlow (Kolors)...")
+        try:
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {
+                "model": SILICONFLOW_MODEL,
+                "prompt": image_prompt + ", masterpiece, cinematic lighting, 8k",
+                "image_size": "768x1024",
+                "batch_size": 1
+            }
+            r = requests.post(SILICONFLOW_API_URL, headers=headers, json=payload, timeout=60)
+            if r.status_code == 200:
+                image_url = r.json()["images"][0]["url"]
+                img_r = requests.get(image_url)
+                raw_path = os.path.join(output_dir, "raw_silicon.png")
+                with open(raw_path, "wb") as f:
+                    f.write(img_r.content)
+                return raw_path
+        except Exception as e:
+            print(f"   SiliconFlow Failed: {e}")
+            
+    # 4. Pollinations (Final Fallback)
+    return _try_pollinations_image(image_prompt, output_dir)
 
 def design_pin_image(raw_image_path: str, title: str, output_dir: str) -> str:
     print("\nPhase 3: Designing final pin image...")
@@ -304,7 +392,11 @@ def main():
         # If in site mode, we link to the specific page. Otherwise, the homepage.
         dest_link = article_context["url"] if article_context else board_info["link"]
         
-        raw_img, _ = generate_image_with_siliconflow(content["image_prompt"], tmp_dir)
+        raw_img = generate_bot_image(content["image_prompt"], tmp_dir)
+        if not raw_img:
+            print("FAILED: Could not generate image from any source.")
+            sys.exit(1)
+            
         final_img = design_pin_image(raw_img, content["title"], tmp_dir)
         
         publish_to_pinterest(

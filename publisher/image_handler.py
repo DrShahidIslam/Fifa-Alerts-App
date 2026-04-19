@@ -301,7 +301,7 @@ def _resize_and_crop(img, target_w, target_h):
 
 
 def _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg):
-    """Try Gemini 2.5 Flash Image (free tier). Returns (webp, jpg) or (None, None)."""
+    """Try Gemini 2.x Flash Image (free tier). Returns (webp, jpg) or (None, None)."""
     try:
         prompt = build_image_prompt(article_title)
         response = generate_image_with_gemini_flash(prompt)
@@ -319,6 +319,98 @@ def _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg):
                 break
     except Exception as e:
         logger.warning(f"    Gemini Flash Image failed: {e}")
+    return None, None
+
+
+def _try_huggingface_image(article_title, output_path_webp, output_path_jpg):
+    """Try Hugging Face Inference API (Serverless). Returns (webp, jpg) or (None, None)."""
+    if not getattr(config, "USE_HUGGING_FACE_IMAGE", True):
+        return None, None
+
+    token = getattr(config, "HUGGING_FACE_TOKEN", "")
+    if not token:
+        return None, None
+
+    import requests
+    try:
+        model_id = getattr(config, "HUGGING_FACE_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
+        # Use the router endpoint which is more reliable for serverless providers
+        url = f"{getattr(config, 'HUGGING_FACE_API_URL', 'https://router.huggingface.co/hf-inference/models')}/{model_id}"
+        
+        prompt = build_image_prompt(article_title)
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        payload = {"inputs": prompt}
+
+        logger.info(f"    Trying Hugging Face ({model_id}): {article_title[:40]}...")
+        response = requests.post(url, headers=headers, json=payload, timeout=90)
+        
+        if response.status_code == 503:
+            logger.info("    HF Model loading (503), retrying in 10s...")
+            import time
+            time.sleep(10)
+            response = requests.post(url, headers=headers, json=payload, timeout=90)
+
+        response.raise_for_status()
+        image_bytes = response.content
+        
+        if "image" not in response.headers.get("Content-Type", "").lower() or len(image_bytes) < 3000:
+            logger.warning(f"    HF response not an image: {response.status_code} {response.headers.get('Content-Type')}")
+            return None, None
+
+        result_webp = _compress_to_webp(image_bytes, output_path_webp)
+        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
+        if result_webp and result_jpg:
+            logger.info(f"    Images ready from Hugging Face: {result_webp}, {result_jpg}")
+            return result_webp, result_jpg
+    except Exception as e:
+        logger.warning(f"    Hugging Face failed: {e}")
+    return None, None
+
+
+def _try_together_image(article_title, output_path_webp, output_path_jpg):
+    """Try Together AI image generation. Returns (webp, jpg) or (None, None)."""
+    if not getattr(config, "USE_TOGETHER_IMAGE", True):
+        return None, None
+
+    api_key = getattr(config, "TOGETHER_API_KEY", "")
+    if not api_key:
+        return None, None
+
+    import requests
+    try:
+        url = getattr(config, "TOGETHER_API_URL", "https://api.together.xyz/v1/images/generations")
+        model = getattr(config, "TOGETHER_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
+        
+        prompt = build_image_prompt(article_title)
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "width": 1024,
+            "height": 768,
+            "steps": 4,
+            "n": 1,
+            "response_format": "b64_json"
+        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        logger.info(f"    Trying Together AI ({model}): {article_title[:40]}...")
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        
+        import base64
+        data = response.json()
+        b64_data = data.get("data", [{}])[0].get("b64_json")
+        if not b64_data:
+            return None, None
+            
+        image_bytes = base64.b64decode(b64_data)
+        result_webp = _compress_to_webp(image_bytes, output_path_webp)
+        result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
+        if result_webp and result_jpg:
+            logger.info(f"    Images ready from Together AI: {result_webp}, {result_jpg}")
+            return result_webp, result_jpg
+    except Exception as e:
+        logger.warning(f"    Together AI failed: {e}")
     return None, None
 
 
@@ -443,14 +535,24 @@ def _try_pollinations_image(article_title, output_path_webp, output_path_jpg):
     import urllib.parse
     import time
     try:
-        logger.info(f"    Trying Pollinations (free): {article_title[:40]}...")
-        prompt = f"Cinematic photography, professional sports journalism, high quality, highly detailed editorial photo for news article about: {article_title}. Realistic, dramatic lighting, 8k resolution, photorealistic"
+        logger.info(f"    Trying Pollinations FLUX (free): {article_title[:40]}...")
+        # Use more descriptive seasoning for Pollinations FLUX
+        prompt = (
+            f"A professional sports photograph of {article_title}. "
+            f"Cinematic lighting, high quality, highly detailed editorial photo, "
+            f"realistic, dramatic atmosphere, 8k resolution, photorealistic"
+        )
         safe_prompt = urllib.parse.quote(prompt)
         seed = int(time.time() * 1000) % 1000000
+        # Explicitly use flux model which is current best on pollinations
         url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width={TARGET_WIDTH}&height={TARGET_HEIGHT}&seed={seed}&nologo=true&model=flux"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; FIFANewsAgent/1.0)"})
-        with urllib.request.urlopen(req, timeout=45) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             image_bytes = response.read()
+            
+        if not image_bytes or len(image_bytes) < 3000:
+            return None, None
+
         result_webp = _compress_to_webp(image_bytes, output_path_webp)
         result_jpg = _compress_to_jpg(image_bytes, output_path_jpg)
         if result_webp and result_jpg:
@@ -503,7 +605,7 @@ def _generate_placeholder_image(article_title, output_path_webp, output_path_jpg
 
 def generate_inline_image(article_title, save_dir=None):
     """
-    Generate a secondary inline image using Kolors API (SiliconFlow) exclusively.
+    Generate a secondary inline image using multiple possible sources.
     Returns the WebP and JPG paths.
     """
     if save_dir is None:
@@ -515,16 +617,28 @@ def generate_inline_image(article_title, save_dir=None):
     output_path_webp = os.path.join(save_dir, f"inline_{slug}_{timestamp}.webp")
     output_path_jpg = os.path.join(save_dir, f"inline_{slug}_{timestamp}.jpg")
 
-    logger.info(f"  Generating Kolors inline image for: {article_title[:60]}")
+    logger.info(f"  Generating inline image for: {article_title[:60]}")
+    
+    # 1. Hugging Face
+    webp, jpg = _try_huggingface_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+    
+    # 2. Together AI
+    webp, jpg = _try_together_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+    
+    # 3. SiliconFlow (Legacy/Credits)
     webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
-    return webp, jpg
+    if webp and jpg: return webp, jpg
+    
+    # 4. Pollinations (Reliable fallback)
+    return _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
 
 
 def generate_featured_image(article_title, save_dir=None, source_url=None):
     """
-    Generate a featured image. Order: Gemini Flash Image -> SiliconFlow FLUX ->
-    optional source article image (og:image) -> Pollinations -> Imagen (if paid) -> placeholder.
-    Compresses to WebP and JPEG under 100KB.
+    Generate a featured image using a hierarchy of AI sources and source imagery.
+    Optimized for cost/free-tier reliability with high aesthetic standards.
     """
     if save_dir is None:
         save_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "images")
@@ -535,31 +649,36 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
     output_path_webp = os.path.join(save_dir, f"{slug}_{timestamp}.webp")
     output_path_jpg = os.path.join(save_dir, f"{slug}_{timestamp}.jpg")
 
-    logger.info(f"  Generating featured image for: {article_title[:60]}")
+    logger.info(f"  Generating featured image hierarchy for: {article_title[:60]}")
 
-    # 1. Free tier: Gemini 2.5 Flash Image
+    # 1. Gemini 2.x Flash Image (If configured/working)
     webp, jpg = _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg:
-        return webp, jpg
+    if webp and jpg: return webp, jpg
 
-    # 2. Free: use image from source article (og:image or first img) — relevant and no quota
+    # 2. Hugging Face Router (FLUX.1-schnell) - High Quality Primary
+    webp, jpg = _try_huggingface_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 3. Together AI (FLUX.1-schnell) - Secondary High Quality
+    webp, jpg = _try_together_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 4. SiliconFlow (Kwai-Kolors/FLUX) - Legacy/Conditional
     webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg:
-        return webp, jpg
+    if webp and jpg: return webp, jpg
 
+    # 5. Source Article Photography (Filtered for branding/logos)
     allow_source_images = getattr(config, "ALLOW_SOURCE_ARTICLE_IMAGES", False)
     fallback_to_source = getattr(config, "SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE", False)
     if source_url and (allow_source_images or fallback_to_source):
         webp, jpg = _try_source_image(source_url, output_path_webp, output_path_jpg)
-        if webp and jpg:
-            return webp, jpg
+        if webp and jpg: return webp, jpg
 
-    # 3. Free: Pollinations
+    # 6. Pollinations FLUX (Reliable, unlimited free fallback)
     webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg:
-        return webp, jpg
+    if webp and jpg: return webp, jpg
 
-    # 4. Paid tier only: Imagen (skip on free tier to avoid 400 errors)
+    # 7. Paid tier only: Gemini Imagen
     if getattr(config, "USE_GEMINI_IMAGEN", False):
         try:
             prompt = build_image_prompt(article_title)
@@ -583,8 +702,8 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
         except Exception as e:
             logger.warning(f"    Imagen failed: {e}")
 
-    # 5. Placeholder (solid color + title text)
-    logger.info("    Using placeholder image (title text)")
+    # 8. Placeholder (Title card)
+    logger.info("    Falling back to placeholder title card")
     return _generate_placeholder_image(article_title, output_path_webp, output_path_jpg)
 
 
