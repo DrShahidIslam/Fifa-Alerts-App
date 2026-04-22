@@ -651,31 +651,30 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
 
     logger.info(f"  Generating featured image hierarchy for: {article_title[:60]}")
 
-    # 1. Gemini 2.x Flash Image (If configured/working)
-    webp, jpg = _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg: return webp, jpg
-
-    # 2. Hugging Face Router (FLUX.1-schnell) - High Quality Primary
-    webp, jpg = _try_huggingface_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg: return webp, jpg
-
-    # 3. Together AI (FLUX.1-schnell) - Secondary High Quality
-    webp, jpg = _try_together_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg: return webp, jpg
-
-    # 4. SiliconFlow (Kwai-Kolors/FLUX) - Legacy/Conditional
-    webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg: return webp, jpg
-
-    # 5. Source Article Photography (Filtered for branding/logos)
-    allow_source_images = getattr(config, "ALLOW_SOURCE_ARTICLE_IMAGES", False)
-    fallback_to_source = getattr(config, "SOURCE_IMAGE_FALLBACK_ON_AI_FAILURE", False)
-    if source_url and (allow_source_images or fallback_to_source):
+    # 1. Source Article Photography (Main priority as requested)
+    allow_source_images = getattr(config, "ALLOW_SOURCE_ARTICLE_IMAGES", True)
+    if source_url and allow_source_images:
         webp, jpg = _try_source_image(source_url, output_path_webp, output_path_jpg)
         if webp and jpg: return webp, jpg
 
-    # 6. Pollinations FLUX (Reliable, unlimited free fallback)
+    # 2. SiliconFlow (Kwai-Kolors/FLUX)
+    webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 3. Pollinations FLUX (Reliable, unlimited free fallback)
     webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 4. Hugging Face Router (FLUX.1-schnell)
+    webp, jpg = _try_huggingface_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 5. Gemini Flash Image (Backup only to save quota)
+    webp, jpg = _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
+    # 6. Together AI (Optional fallback)
+    webp, jpg = _try_together_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg: return webp, jpg
 
     # 7. Paid tier only: Gemini Imagen

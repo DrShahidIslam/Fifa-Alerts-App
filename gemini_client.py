@@ -18,8 +18,9 @@ def _classify_gemini_error(error):
     upper = error_str.upper()
     return {
         "error_str": error_str,
-        "is_rate_limit": "429" in error_str or "RESOURCE_EXHAUSTED" in upper,
-        "is_daily_quota": "limit: 0" in error_str or "PERDAY" in upper,
+        "is_rate_limit": "429" in error_str or "RESOURCE_EXHAUSTED" in upper or "RATELIMIT" in upper,
+        "is_daily_quota": "limit: 0" in error_str or "PERDAY" in upper or "QUOTA_EXHAUSTED" in upper,
+        "is_permission_denied": "403" in error_str or "PERMISSION_DENIED" in upper,
         "is_temporary_unavailable": (
             "503" in error_str
             or "500" in error_str
@@ -83,13 +84,16 @@ def generate_content_with_fallback(
                     logger.warning(f"  Error from key {key_idx + 1}: {e}. Trying next key...")
                     break
 
-                if error_meta["is_daily_quota"]:
-                    logger.warning(f"  Gemini daily quota exhausted for key {key_idx + 1}/{len(keys)}.")
+                if error_meta["is_daily_quota"] or error_meta["is_permission_denied"]:
+                    reason = "daily quota exhausted" if error_meta["is_daily_quota"] else "permission denied"
+                    logger.warning(f"  Gemini {reason} for key {key_idx + 1}/{len(keys)}. Skipping key...")
                     break
 
                 if key_idx < len(keys) - 1:
                     reason = "rate limited" if error_meta["is_rate_limit"] else "temporarily unavailable"
-                    logger.warning(f"  Gemini {reason} on key {key_idx + 1}, trying next key immediately...")
+                    delay = _compute_retry_delay(error_str, 5, 0) # Small wait before switching keys to avoid hitting global RPM
+                    logger.warning(f"  Gemini {reason} on key {key_idx + 1}, waiting {delay:.1f}s before trying next key...")
+                    time.sleep(delay)
                     break
 
                 if attempt >= max_retries_per_key:
@@ -141,7 +145,7 @@ def generate_image_with_gemini_flash(prompt, max_retries_per_key=2, base_delay=1
         for attempt in range(max_retries_per_key + 1):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash-image",
+                    model=config.GEMINI_MODEL,
                     contents=contents,
                     config=config_obj,
                 )

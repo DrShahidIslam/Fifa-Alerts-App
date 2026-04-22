@@ -124,7 +124,7 @@ ARTICLE_MIN_UNIQUE_SOURCE_DOMAINS = int(os.getenv("ARTICLE_MIN_UNIQUE_SOURCE_DOM
 TREND_WATCHLIST_LIMIT = int(os.getenv("TREND_WATCHLIST_LIMIT", "25"))
 ARTICLE_RESEARCH_QUERY_LIMIT = int(os.getenv("ARTICLE_RESEARCH_QUERY_LIMIT", "6"))
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 SKIP_AI_IMAGE = os.getenv("SKIP_AI_IMAGE", "false").lower() in ("true", "1", "yes")
 USE_GEMINI_IMAGEN = os.getenv("USE_GEMINI_IMAGEN", "false").lower() in ("true", "1", "yes")
 ALLOW_SOURCE_ARTICLE_IMAGES = os.getenv("ALLOW_SOURCE_ARTICLE_IMAGES", "true").lower() in ("true", "1", "yes")
