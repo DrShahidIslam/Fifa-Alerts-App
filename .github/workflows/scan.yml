@@ -50,6 +50,9 @@ jobs:
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           WP_PUBLISH_WEBHOOK_URL: ${{ secrets.WP_PUBLISH_WEBHOOK_URL }}
           WP_PUBLISH_SECRET: ${{ secrets.WP_PUBLISH_SECRET }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+          HUGGING_FACE_TOKEN: ${{ secrets.HUGGING_FACE_TOKEN }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
         run: python main.py --once
 
       - name: Save agent state to cache

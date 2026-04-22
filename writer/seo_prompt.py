@@ -526,8 +526,8 @@ SUPPORTING KEYWORDS: {supporting_keywords}
    a) Treat the PRIMARY KEYWORD as the lead search target.
    b) Use SECONDARY KEYWORDS only where they genuinely improve topical coverage.
    c) Use SUPPORTING KEYWORDS to deepen context, FAQs, and entity relationships. Do not stuff them.
-2) MAIN TITLE: Keep the visible article title compact, editorial, and natural, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). Do not stack multiple clauses, repeat the same keyword, or break words awkwardly to hit length limits.
-3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and should ideally be under 60 characters, but prioritize natural, grammatical phrasing over strict word-breaking.
+2) MAIN TITLE: Keep the visible article title compact, editorial, and natural, ideally 45-70 characters. It must include a clear hook, the exact main keyword, and if natural one supporting keyword or entity (player, team, or competition). IMPORTANT: Use at most ONE colon (:) in the title. Do not use generic prefixes like "Transfer rumors, news:" or "Breaking:". Lead with the specific news item or entity. Do not stack multiple clauses.
+3) META TITLE: Create a separate meta title for search results. It must contain the exact main keyword and should ideally be under 60 characters. Do not use more than one colon. Prioritize natural, grammatical phrasing over strict word-breaking.
 4) META DESCRIPTION: The meta description must contain the main keyword and name the primary entity. It should ideally be between 140 and 155 characters. Prioritize a natural sentence structure over strict character counts that break words. Use an action verb plus curiosity gap.
 5) FIRST PARAGRAPH — CRITICAL (this is the most important paragraph for user engagement and SEO):
    a) Must be 25-45 words: enough to be substantive, short enough to be punchy.
@@ -563,10 +563,10 @@ SUPPORTING KEYWORDS: {supporting_keywords}
 
 --- ARTICLE STRUCTURE ---
 
-1. TITLE: Visible on-page headline. Natural, editorial, compact, and usually 45-70 characters. Include a hook, the main keyword naturally, and an entity if it fits. Ensure sentences read fluently and no words are broken.
-2. SEO_TITLE: Separate meta title for search results. Keep it naturally under 60 characters without breaking words, and include the exact main keyword.
-3. META_DESCRIPTION: Between 140-155 characters. Prioritize readable, full sentences over strict length limits that break words. Include the exact main keyword and primary entity name.
-4. SLUG: extremely short, punchy, keyword-rich, lowercase, hyphens only, and based on the main keyword.
+1. TITLE: Visible on-page headline. Natural, editorial, compact, 45-70 characters. Use exactly ONE colon (:) if needed, or no colon. Do not use generic prefixes. Include the main keyword and a specific news hook.
+2. SEO_TITLE: Search engine title. Max 60 characters. Must contain the exact main keyword. Do not stack colons.
+3. META_DESCRIPTION: 140-155 characters. Full, natural sentences. Include the exact main keyword and primary entity.
+4. SLUG: Extremely short (3-5 words), keyword-rich, lowercase, hyphens only.
 5. ARTICLE BODY: Magazine-quality HTML with a hook intro before the first H2. Include the exact placeholder text `%%INLINE_IMAGE%%` on its own line between paragraphs somewhere in the middle of the article body. This is critical for our image insertion.
 6. FAQ: 3-4 schema-ready questions.
 

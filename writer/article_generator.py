@@ -217,7 +217,9 @@ def _strip_title_markup(value):
 
 
 def _dedupe_title_phrases(title):
-    parts = [part.strip(" -:|,") for part in re.split(r"\s*[:|,-]\s*", title) if part.strip(" -:|,")]
+    # Only split by major structural separators (colons, pipes) for deduplication.
+    # Commas and hyphens are often part of a single natural phrase.
+    parts = [part.strip(" -:|,") for part in re.split(r"\s*[:|]\s*", title) if part.strip(" -:|,")]
     deduped = []
     seen = set()
     for part in parts:
@@ -230,42 +232,45 @@ def _dedupe_title_phrases(title):
 
 
 def _build_article_title(raw_title, primary_keyword, topic_title, primary_entity=""):
-    title = _dedupe_title_phrases(_strip_title_markup(raw_title or ""))
+    # Strip any markdown or weird characters first
+    title = _strip_title_markup(raw_title or "")
     topic = _strip_title_markup(topic_title)
     keyword = _strip_title_markup(primary_keyword)
     entity = _strip_title_markup(primary_entity)
 
+    # If title is generic, use topic or keyword
     if not title or title.lower() in {"general football", "football", "soccer"}:
         title = topic or keyword
 
+    # Deduplicate phrases separated by : or |
+    title = _dedupe_title_phrases(title)
+
+    # Ensure focus keyword is present
     if not _contains_keyword(title, keyword):
         lead = entity or topic
         if lead and lead.lower() != keyword.lower():
             title = f"{lead}: {keyword}"
         else:
-            title = keyword or title
+            title = f"{keyword}: {title}" if title else keyword
 
+    # Clean author attribution if hallucinated
     title = re.split(r"\s+By\s+\w+", title, maxsplit=1, flags=re.IGNORECASE)[0].strip()
     title = re.sub(r"\b(the endur\w+ quest.*|with immediate implications.*)$", "", title, flags=re.IGNORECASE).strip(" -:|,")
 
+    # If we have too many segments, keep the first two
     segments = [seg.strip() for seg in re.split(r"\s*:\s*", title) if seg.strip()]
     if len(segments) > 2:
+        # Special case: if the first segment is "Transfer rumors, news", it's a category prefix we might want to keep
+        # but let's prioritize the news content.
         title = ": ".join(segments[:2])
 
-    if len(title) > 70:
-        candidate = ""
+    # Final length check
+    if len(title) > 75:
         if entity and keyword and entity.lower() != keyword.lower():
             candidate = f"{entity}: {keyword}"
-        elif keyword:
-            candidate = keyword
-        if topic and keyword and topic.lower() != keyword.lower():
-            topic_words = topic.split()
-            short_topic = " ".join(topic_words[:6]).strip(" -:|,")
-            candidate = f"{short_topic}: {keyword}" if short_topic else candidate
-        title = candidate or title
-
-    if len(title) > 70:
-        title = _trim_to_limit(title, 70)
+            if len(candidate) < len(title):
+                title = candidate
+        title = _trim_to_limit(title, 75)
 
     return title.strip(" -:|,")
 
@@ -435,15 +440,25 @@ def _discover_additional_source_urls(topic, existing_urls=None, source_texts=Non
 
 
 def _build_meta_title(seo_title, primary_keyword, article_title=""):
+    # Try candidates from candidates builder
     for candidate in _build_meta_title_candidate(primary_keyword, article_title=article_title, seo_title=seo_title):
         candidate = _clean_fragment(candidate)
         if not candidate:
             continue
+        # Ensure it contains the keyword
         if not _contains_keyword(candidate, primary_keyword):
             continue
+        # Limit to 60 chars for SEO
         candidate = _trim_to_limit(candidate, 60)
+        # If it's different from the article title (good for SEO variety)
         if candidate and candidate.lower() != _normalize_whitespace(article_title).lower():
             return _clean_fragment(candidate)
+    
+    # Fallback: if article title is good and has keyword, use it
+    if article_title and _contains_keyword(article_title, primary_keyword):
+        return _trim_to_limit(_clean_fragment(article_title), 60)
+
+    # Hard fallback: Keyword
     return _trim_to_limit(_clean_fragment(primary_keyword), 60)
 
 

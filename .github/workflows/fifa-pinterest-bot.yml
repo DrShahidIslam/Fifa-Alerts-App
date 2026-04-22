@@ -35,6 +35,8 @@ jobs:
           PINTEREST_BOARD_STADIUM_VENUES: ${{ secrets.PINTEREST_BOARD_STADIUM_VENUES }}
           PINTEREST_BOARD_TRANSFER_NEWS: ${{ secrets.PINTEREST_BOARD_TRANSFER_NEWS }}
           PINTEREST_BOARD_TACTICS: ${{ secrets.PINTEREST_BOARD_TACTICS }}
+          HUGGING_FACE_TOKEN: ${{ secrets.HUGGING_FACE_TOKEN }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
         run: |
           # Move into the bot directory
           cd fifa_pinterest_bot
