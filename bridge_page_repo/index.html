@@ -3,26 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Soccer Alerts - Premium Football News</title>
-    <meta name="description" content="Your independent source for global soccer alerts and premium football news.">
+    <title>Global Soccer Alerts | Premium Football News</title>
+    <meta name="description" content="Your authoritative source for global soccer alerts, tactical analysis, and premium football news.">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --surface-color: rgba(25, 33, 49, 0.6);
-            --border-color: rgba(255, 255, 255, 0.1);
-            --accent-primary: #00ff88;
-            --accent-secondary: #00b8ff;
+            --bg-base: #06090e;
+            --bg-surface: #101623;
+            --bg-card: #161e2e;
+            --border-dim: rgba(255, 255, 255, 0.08);
+            --accent-green: #00ff88;
+            --accent-green-glow: rgba(0, 255, 136, 0.3);
+            --accent-blue: #00b8ff;
             --text-main: #ffffff;
             --text-muted: #94a3b8;
+            --text-dark: #0f172a;
         }
 
         * {
@@ -32,215 +35,523 @@
         }
 
         body {
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-base);
             color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            overflow-x: hidden;
-            position: relative;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Ambient Glow Background */
-        .ambient-light {
-            position: absolute;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, var(--accent-primary) 0%, transparent 60%);
-            opacity: 0.15;
-            filter: blur(100px);
-            z-index: 0;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: pulse 8s infinite alternate;
+        h1, h2, h3, h4, h5, .brand-text {
+            font-family: 'Outfit', sans-serif;
         }
 
-        @keyframes pulse {
-            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.1; }
-            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.2; }
+        a {
+            text-decoration: none;
+            color: inherit;
         }
 
-        .container {
-            position: relative;
-            z-index: 10;
-            max-width: 600px;
-            width: 90%;
-            padding: 40px;
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 24px;
+        /* ----- NAVIGATION ----- */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10, 15, 25, 0.85);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        @keyframes slideUp {
-            to { opacity: 1; transform: translateY(0); }
+            border-bottom: 1px solid var(--border-dim);
+            padding: 16px 5%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 12px;
-            margin-bottom: 24px;
         }
 
         .brand i {
-            font-size: 32px;
-            color: var(--accent-primary);
-        }
-
-        .brand h1 {
-            font-weight: 800;
+            color: var(--accent-green);
             font-size: 28px;
-            background: linear-gradient(135deg, var(--text-main), var(--text-muted));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.5px;
         }
 
-        .content-box {
-            margin: 30px 0;
-        }
-
-        .article-title {
-            font-size: 22px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            line-height: 1.4;
-        }
-
-        .article-desc {
-            color: var(--text-muted);
-            font-size: 16px;
-            margin-bottom: 30px;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: linear-gradient(135deg, var(--accent-primary), #00cc6a);
-            color: #000;
+        .brand-text {
+            font-size: 24px;
             font-weight: 800;
-            font-size: 18px;
-            padding: 16px 32px;
-            border-radius: 100px;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 20px -10px var(--accent-primary);
-            position: relative;
-            overflow: hidden;
-            border: none;
-            cursor: pointer;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 25px -10px var(--accent-primary);
+        .nav-links {
+            display: flex;
+            gap: 30px;
         }
 
-        .btn i {
-            font-size: 20px;
-            transition: transform 0.3s ease;
-        }
-
-        .btn:hover i {
-            transform: translateX(4px);
-        }
-
-        .footer {
-            margin-top: 40px;
-            font-size: 14px;
+        .nav-links a {
+            font-size: 15px;
+            font-weight: 600;
             color: var(--text-muted);
+            transition: color 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--accent-green);
+        }
+
+        .subscribe-btn {
+            background: var(--accent-green);
+            color: var(--text-dark);
+            padding: 10px 24px;
+            border-radius: 100px;
+            font-weight: 700;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .subscribe-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--accent-green-glow);
+        }
+
+        /* ----- HERO SECTION ----- */
+        .hero {
+            position: relative;
+            padding: 80px 5%;
+            min-height: 600px;
+            display: flex;
+            align-items: flex-end;
+            background-color: var(--bg-surface);
+            background-image: linear-gradient(to top, var(--bg-base) 0%, transparent 80%), url('assets/hero_stadium.png');
+            background-size: cover;
+            background-position: center;
+            border-bottom: 1px solid var(--border-dim);
+        }
+
+        .hero-content {
+            max-width: 800px;
+            position: relative;
             z-index: 10;
         }
 
-        .footer a {
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.2s ease;
-            margin: 0 10px;
-        }
-
-        .footer a:hover {
-            color: var(--text-main);
-        }
-
-        .loader {
+        .badge {
             display: inline-block;
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .hero-title {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+
+        .hero-desc {
+            font-size: 20px;
+            color: #cbd5e1;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        /* ----- MAIN CONTENT & GRID ----- */
+        .main-container {
+            padding: 60px 5%;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-dim);
+            padding-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 800;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -21px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--accent-green);
+        }
+
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .news-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .card-img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-bottom: 1px solid var(--border-dim);
+        }
+
+        .card-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .card-category {
+            color: var(--accent-blue);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .card-excerpt {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* ----- FOOTER ----- */
+        .footer {
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border-dim);
+            padding: 60px 5% 40px;
+            margin-top: 60px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 40px;
+        }
+
+        .footer-about p {
+            color: var(--text-muted);
+            margin-top: 20px;
+            font-size: 15px;
+            max-width: 400px;
+        }
+
+        .footer-links h4 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .footer-links ul {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-green);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid var(--border-dim);
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        /* ----- DYNAMIC OVERLAY (BRIDGE LOGIC) ----- */
+        #bridge-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(6, 9, 14, 0.95);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .bridge-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 24px;
+            padding: 50px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            transform: translateY(30px);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #bridge-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        #bridge-overlay.active .bridge-card {
+            transform: translateY(0);
+        }
+
+        .bridge-icon {
+            font-size: 48px;
+            color: var(--accent-green);
+            margin-bottom: 20px;
+        }
+
+        .bridge-title {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .bridge-desc {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .btn-large {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: var(--accent-green);
+            color: var(--text-dark);
+            font-size: 18px;
+            font-weight: 800;
+            padding: 18px 40px;
+            border-radius: 100px;
+            width: 100%;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-large:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px var(--accent-green-glow);
+        }
+
+        .loader-ring {
+            display: none;
             width: 24px;
             height: 24px;
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            border-radius: 50%;
+            border: 3px solid rgba(0,0,0,0.2);
             border-top-color: #000;
-            animation: spin 1s ease-in-out infinite;
-            display: none;
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Generic Mode Styles */
-        #generic-content {
-            display: none;
+        @media (max-width: 768px) {
+            .hero-title { font-size: 40px; }
+            .nav-links { display: none; }
+            .footer-grid { grid-template-columns: 1fr; gap: 40px; }
         }
     </style>
 </head>
 <body>
 
-    <div class="ambient-light"></div>
-
-    <div class="container">
+    <!-- NAVIGATION -->
+    <nav class="navbar">
         <div class="brand">
             <i class="ph-fill ph-soccer-ball"></i>
-            <h1>Global Soccer Alerts</h1>
+            <span class="brand-text">GSA News</span>
         </div>
+        <div class="nav-links">
+            <a href="#" class="active">Home</a>
+            <a href="#">Latest</a>
+            <a href="#">Tactics</a>
+            <a href="#">History</a>
+        </div>
+        <a href="#" class="subscribe-btn">Subscribe</a>
+    </nav>
 
-        <div id="dynamic-content" class="content-box">
-            <h2 id="article-title" class="article-title">Premium Soccer Update</h2>
-            <p class="article-desc">You are one step away from reading the full article on our partner network.</p>
-            <a href="#" id="action-btn" class="btn">
-                <span>Read Full Article</span>
-                <i class="ph ph-arrow-right"></i>
-                <div class="loader" id="btn-loader"></div>
+    <!-- HERO SECTION -->
+    <header class="hero">
+        <div class="hero-content">
+            <span class="badge">Exclusive</span>
+            <h1 class="hero-title">Inside the Ultimate Fan Guide to the 2026 Tournament</h1>
+            <p class="hero-desc">From massive new stadium logistics to ticket distributions, everything you need to know about the upcoming global spectacle across North America.</p>
+            <a href="#" class="subscribe-btn" style="display: inline-flex; align-items: center; gap: 8px;">
+                Read Full Story <i class="ph ph-arrow-right"></i>
             </a>
         </div>
+    </header>
 
-        <div id="generic-content" class="content-box">
-            <h2 class="article-title">Independent Football News Aggregator</h2>
-            <p class="article-desc">Bringing you the latest tactical analysis, transfer alerts, and match reports from across the globe.</p>
+    <!-- CONTENT GRID -->
+    <main class="main-container">
+        <div class="section-header">
+            <h2 class="section-title">Latest Alerts</h2>
+        </div>
+        
+        <div class="news-grid">
+            <!-- Card 1 -->
+            <article class="news-card">
+                <img src="assets/tactics_board.png" alt="Tactics" class="card-img" onerror="this.src='https://via.placeholder.com/600x400/101623/ffffff?text=Tactical+Analysis'">
+                <div class="card-content">
+                    <span class="card-category">Tactical Analysis</span>
+                    <h3 class="card-title">How the Modern 4-3-3 is Evolving the Game</h3>
+                    <p class="card-excerpt">A deep dive into the tactical shifts top managers are employing to dominate the midfield and exploit the half-spaces.</p>
+                    <div class="card-meta">
+                        <i class="ph ph-clock"></i> 2 hours ago
+                    </div>
+                </div>
+            </article>
+
+            <!-- Card 2 -->
+            <article class="news-card">
+                <img src="assets/player_celebration.png" alt="Celebration" class="card-img" onerror="this.src='https://via.placeholder.com/600x400/101623/ffffff?text=Player+Spotlight'">
+                <div class="card-content">
+                    <span class="card-category">Player Spotlight</span>
+                    <h3 class="card-title">The Golden Boot Race: Who Will Reign Supreme?</h3>
+                    <p class="card-excerpt">Analyzing the top contenders for the ultimate scoring prize. From seasoned veterans to breakout wonderkids.</p>
+                    <div class="card-meta">
+                        <i class="ph ph-clock"></i> 5 hours ago
+                    </div>
+                </div>
+            </article>
+
+            <!-- Card 3 -->
+            <article class="news-card">
+                <div class="card-img" style="background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; align-items: center; justify-content: center;">
+                    <i class="ph ph-arrows-left-right" style="font-size: 64px; color: rgba(255,255,255,0.1)"></i>
+                </div>
+                <div class="card-content">
+                    <span class="card-category">Transfers</span>
+                    <h3 class="card-title">Transfer Window Shocks: 5 Biggest Moves Expected</h3>
+                    <p class="card-excerpt">Rumors are swirling as European giants prepare their war chests for a massive summer spending spree.</p>
+                    <div class="card-meta">
+                        <i class="ph ph-clock"></i> 12 hours ago
+                    </div>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="footer-grid">
+            <div class="footer-about">
+                <div class="brand">
+                    <i class="ph-fill ph-soccer-ball"></i>
+                    <span class="brand-text">GSA News</span>
+                </div>
+                <p>Global Soccer Alerts is your independent, premium source for global football intelligence, tactical breakdowns, and breaking news alerts.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Legal</h4>
+                <ul>
+                    <li><a href="privacy.html">Privacy Policy</a></li>
+                    <li><a href="terms.html">Terms of Service</a></li>
+                    <li><a href="#">Cookie Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Network</h4>
+                <ul>
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Contact Editorial</a></li>
+                    <li><a href="https://github.com/DrShahidIslam">Developers (API)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; <script>document.write(new Date().getFullYear())</script> Global Soccer Alerts. All rights reserved.</span>
+            <span>Independent Football Aggregator</span>
+        </div>
+    </footer>
+
+    <!-- DYNAMIC BRIDGE OVERLAY -->
+    <div id="bridge-overlay">
+        <div class="bridge-card">
+            <i class="ph-fill ph-bell-ringing bridge-icon"></i>
+            <h2 class="bridge-title" id="bridge-title">News Alert</h2>
+            <p class="bridge-desc">You are attempting to access a premium article alert from our external partner network.</p>
+            
+            <button id="bridge-btn" class="btn-large">
+                <span class="btn-text">Continue to Article</span>
+                <i class="ph ph-arrow-right btn-icon"></i>
+                <div class="loader-ring"></div>
+            </button>
         </div>
     </div>
 
-    <div class="footer">
-        <p>&copy; <script>document.write(new Date().getFullYear())</script> Global Soccer Alerts. All rights reserved.</p>
-        <div style="margin-top: 10px;">
-            <a href="privacy.html">Privacy Policy</a>
-            <a href="terms.html">Terms of Service</a>
-        </div>
-    </div>
-
+    <!-- SCRIPT LOGIC -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const articleSlug = urlParams.get('article');
             
-            const dynamicContent = document.getElementById('dynamic-content');
-            const genericContent = document.getElementById('generic-content');
-            const actionBtn = document.getElementById('action-btn');
-            const articleTitleEl = document.getElementById('article-title');
-
             if (articleSlug) {
                 // Formatting the slug into a readable title roughly
                 const formattedTitle = articleSlug
@@ -248,33 +559,41 @@
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(' ');
                 
-                articleTitleEl.textContent = `Alert: ${formattedTitle}`;
+                document.getElementById('bridge-title').textContent = formattedTitle;
+                
+                // Show overlay and lock body scroll
+                const overlay = document.getElementById('bridge-overlay');
+                overlay.style.display = 'flex';
+                // Slight delay for animation
+                setTimeout(() => {
+                    overlay.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                }, 50);
+
+                const bridgeBtn = document.getElementById('bridge-btn');
                 
                 // REVIEW MODE: Temporarily disable the actual link to the main site to pass Pinterest compliance
                 // const destinationUrl = `YOUR_DOMAIN_URL/${articleSlug}/`;
-                // actionBtn.href = destinationUrl;
-                
-                actionBtn.href = "#";
+                // bridgeBtn.onclick = () => window.location.href = destinationUrl;
 
-                actionBtn.addEventListener('click', function(e) {
+                bridgeBtn.onclick = function(e) {
                     e.preventDefault();
-                    // Visual feedback on click
-                    this.querySelector('span').style.display = 'none';
-                    this.querySelector('i').style.display = 'none';
-                    document.getElementById('btn-loader').style.display = 'inline-block';
+                    
+                    // Visual feedback
+                    this.querySelector('.btn-text').style.display = 'none';
+                    this.querySelector('.btn-icon').style.display = 'none';
+                    this.querySelector('.loader-ring').style.display = 'block';
                     
                     // Show coming soon message instead of redirecting
                     setTimeout(() => {
-                        alert("We are currently upgrading our platform. Full articles will be available soon!");
-                        this.querySelector('span').style.display = 'inline';
-                        this.querySelector('i').style.display = 'inline';
-                        document.getElementById('btn-loader').style.display = 'none';
+                        alert("We are currently upgrading our partner platform. Full articles will be available soon!");
+                        
+                        // Reset button
+                        this.querySelector('.btn-text').style.display = 'inline';
+                        this.querySelector('.btn-icon').style.display = 'inline-block';
+                        this.querySelector('.loader-ring').style.display = 'none';
                     }, 1000);
-                });
-            } else {
-                // No article param, show generic landing page
-                dynamicContent.style.display = 'none';
-                genericContent.style.display = 'block';
+                };
             }
         });
     </script>
