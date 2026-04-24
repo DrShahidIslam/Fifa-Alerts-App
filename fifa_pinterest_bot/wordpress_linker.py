@@ -86,11 +86,14 @@ def get_random_site_article():
     # Try to get extra context from the DB
     summary = get_article_context(url)
     
+    bridge_url = f"https://DrShahidIslam.github.io/?article={raw_slug}"
+    
     print(f"   Selected: {topic}")
-    print(f"   URL: {url}")
+    print(f"   Bridge URL: {bridge_url}")
+    print(f"   Original URL: {url}")
     
     return {
-        "url": url,
+        "url": bridge_url,
         "topic": topic,
         "summary": summary or topic,
         "slug": raw_slug

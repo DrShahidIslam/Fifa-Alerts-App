@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Soccer Alerts - Premium Football News</title>
+    <meta name="description" content="Your independent source for global soccer alerts and premium football news.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --surface-color: rgba(25, 33, 49, 0.6);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-primary: #00ff88;
+            --accent-secondary: #00b8ff;
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient Glow Background */
+        .ambient-light {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-primary) 0%, transparent 60%);
+            opacity: 0.15;
+            filter: blur(100px);
+            z-index: 0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 8s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.1; }
+            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.2; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 600px;
+            width: 90%;
+            padding: 40px;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .brand i {
+            font-size: 32px;
+            color: var(--accent-primary);
+        }
+
+        .brand h1 {
+            font-weight: 800;
+            font-size: 28px;
+            background: linear-gradient(135deg, var(--text-main), var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .content-box {
+            margin: 30px 0;
+        }
+
+        .article-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .article-desc {
+            color: var(--text-muted);
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, var(--accent-primary), #00cc6a);
+            color: #000;
+            font-weight: 800;
+            font-size: 18px;
+            padding: 16px 32px;
+            border-radius: 100px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px -10px var(--accent-primary);
+            position: relative;
+            overflow: hidden;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px var(--accent-primary);
+        }
+
+        .btn i {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .btn:hover i {
+            transform: translateX(4px);
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            color: var(--text-muted);
+            z-index: 10;
+        }
+
+        .footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+            margin: 0 10px;
+        }
+
+        .footer a:hover {
+            color: var(--text-main);
+        }
+
+        .loader {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #000;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Generic Mode Styles */
+        #generic-content {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-light"></div>
+
+    <div class="container">
+        <div class="brand">
+            <i class="ph-fill ph-soccer-ball"></i>
+            <h1>Global Soccer Alerts</h1>
+        </div>
+
+        <div id="dynamic-content" class="content-box">
+            <h2 id="article-title" class="article-title">Premium Soccer Update</h2>
+            <p class="article-desc">You are one step away from reading the full article on our partner network.</p>
+            <a href="#" id="action-btn" class="btn">
+                <span>Read Full Article</span>
+                <i class="ph ph-arrow-right"></i>
+                <div class="loader" id="btn-loader"></div>
+            </a>
+        </div>
+
+        <div id="generic-content" class="content-box">
+            <h2 class="article-title">Independent Football News Aggregator</h2>
+            <p class="article-desc">Bringing you the latest tactical analysis, transfer alerts, and match reports from across the globe.</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> Global Soccer Alerts. All rights reserved.</p>
+        <div style="margin-top: 10px;">
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const articleSlug = urlParams.get('article');
+            
+            const dynamicContent = document.getElementById('dynamic-content');
+            const genericContent = document.getElementById('generic-content');
+            const actionBtn = document.getElementById('action-btn');
+            const articleTitleEl = document.getElementById('article-title');
+
+            if (articleSlug) {
+                // Formatting the slug into a readable title roughly
+                const formattedTitle = articleSlug
+                    .split('-')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                
+                articleTitleEl.textContent = `Alert: ${formattedTitle}`;
+                
+                // REVIEW MODE: Temporarily disable the actual link to the main site to pass Pinterest compliance
+                // const destinationUrl = `YOUR_DOMAIN_URL/${articleSlug}/`;
+                // actionBtn.href = destinationUrl;
+                
+                actionBtn.href = "#";
+
+                actionBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Visual feedback on click
+                    this.querySelector('span').style.display = 'none';
+                    this.querySelector('i').style.display = 'none';
+                    document.getElementById('btn-loader').style.display = 'inline-block';
+                    
+                    // Show coming soon message instead of redirecting
+                    setTimeout(() => {
+                        alert("We are currently upgrading our platform. Full articles will be available soon!");
+                        this.querySelector('span').style.display = 'inline';
+                        this.querySelector('i').style.display = 'inline';
+                        document.getElementById('btn-loader').style.display = 'none';
+                    }, 1000);
+                });
+            } else {
+                // No article param, show generic landing page
+                dynamicContent.style.display = 'none';
+                genericContent.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
