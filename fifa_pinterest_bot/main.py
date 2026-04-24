@@ -48,27 +48,27 @@ BOARD_MAP = {
     "ultimate_guide": {
         "board_id": os.getenv("PINTEREST_BOARD_ULTIMATE_GUIDE", ""),
         "name": "FIFA World Cup 2026: Ultimate Fan Guide",
-        "link": "https://DrShahidIslam.github.io/",
+        "link": "https://DrShahidIslam.github.io/global-soccer-news/",
     },
     "host_cities": {
         "board_id": os.getenv("PINTEREST_BOARD_HOST_CITIES", ""),
         "name": "WC 2026 Host Cities & Massive Stadiums",
-        "link": "https://DrShahidIslam.github.io/",
+        "link": "https://DrShahidIslam.github.io/global-soccer-news/",
     },
     "qualifiers": {
         "board_id": os.getenv("PINTEREST_BOARD_QUALIFIERS", ""),
         "name": "Qualifiers & National Team Spotlights",
-        "link": "https://DrShahidIslam.github.io/",
+        "link": "https://DrShahidIslam.github.io/global-soccer-news/",
     },
     "history": {
         "board_id": os.getenv("PINTEREST_BOARD_HISTORY", ""),
         "name": "World Cup History, Records & Legends",
-        "link": "https://DrShahidIslam.github.io/",
+        "link": "https://DrShahidIslam.github.io/global-soccer-news/",
     },
     "tactics": {
         "board_id": os.getenv("PINTEREST_BOARD_TACTICS", ""),
         "name": "Football Tactics & Transfer Analysis",
-        "link": "https://DrShahidIslam.github.io/",
+        "link": "https://DrShahidIslam.github.io/global-soccer-news/",
     },
 }
 
