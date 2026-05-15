@@ -503,10 +503,9 @@ def build_article_prompt(topic_title, source_texts, matched_keyword="", keyword_
     secondary_keywords = ", ".join(keyword_strategy.get("secondary", [])[:4]) or "None"
     supporting_keywords = ", ".join(keyword_strategy.get("supporting", [])[:8]) or "None"
 
-    prompt = f"""You are an expert sports journalist and master of Semantic Search, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization) for fifa-worldcup26.com.
-Your articles must be engineered to rank by providing high information density, clear entity relationships, and direct answers.
+    prompt = f"""You are an authoritative football historian and senior investigative journalist for fifa-worldcup26.com. Your writing is characterized by deep tactical knowledge, historical context, and a commitment to providing fans with a premium "human-led" reading experience.
 
-TASK: Write a complete, publish-ready article about the following trending topic.
+TASK: Write a comprehensive, insightful article about the following trending topic. Your goal is to provide "Helpful Content" that satisfies both search intent and a reader's desire for original analysis.
 
 TRENDING TOPIC: {topic_title}
 PRIMARY KEYWORD: {matched_keyword or topic_title}
@@ -539,14 +538,13 @@ SUPPORTING KEYWORDS: {supporting_keywords}
 6) ENTITY-FIRST WRITING: Every section's opening sentence should lead with the most important entity name (person, team, or event) as the grammatical subject, not a vague pronoun or filler phrase.
 7) VALUE-ADD ANALYSIS: Include one dedicated paragraph early in the article that goes beyond reporting. It must explain the likely impact of the news on fans, the team or player involved, upcoming matches, rankings, transfers, tactics, or the wider World Cup 2026 picture. This paragraph must be analytical, cautious, and original rather than a reworded summary.
 8) KEYWORD PLACEMENT: Include the main keyword naturally in the short slug, opening paragraph, at least one H2, and the conclusion. Avoid stuffing.
-9) AEO OPTIMIZATION (Answer Engines like Google AI Overview, Perplexity, ChatGPT):
-   a) Write at least 3 sentences in the article that directly answer likely search questions (who, what, when, where, why, how) in a single, self-contained, factual sentence that an AI engine can quote verbatim.
-   b) Use question-matching phrasing: open at least 2 sentences with "Who", "When", "Why", or "How" to mirror natural queries.
-   c) Place the most direct answer within the first 150 words of the article.
-10) GEO OPTIMIZATION (Generative Engine Optimization):
-   a) Write with high information density: no filler sentences, every sentence must add a new fact or insight.
-   b) Use clear entity co-occurrence: mention related entities together (e.g., player + team + competition in the same sentence) to strengthen knowledge graph signals.
-   c) Include at least one "definitive statement" per section that states a verifiable fact clearly.
+9) AUTHORITATIVE REPORTING:
+   a) Provide direct, factual answers to the core questions (Who, What, Where, When, Why, How) early in the article.
+   b) Write self-contained, definitive sentences that provide immediate value to a reader seeking quick information.
+10) INFORMATION DENSITY & RELATIONSHIPS:
+   a) Maintain high information density: every sentence must contribute new facts, context, or professional insight.
+   b) Mention related entities (players, teams, stadiums) together to build a comprehensive "topic map" for the reader.
+   c) Include at least one "Expert Insight" or definitive conclusion per section.
 11) EXTERNAL LINKING: Include exactly ONE high-quality, high-authority external link (e.g., to BBC, ESPN, or official sites) naturally in the article to boost SEO.
 12) STYLE: No emojis. No long punctuation dashes. Keep paragraphs short, max 2 sentences per <p>.
 13) SCHEMA TAGS: FAQ JSON-LD must be wrapped in <script type="application/ld+json"> and </script>.
