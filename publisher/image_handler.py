@@ -661,23 +661,19 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
     webp, jpg = _try_siliconflow_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg: return webp, jpg
 
-    # 3. Pollinations FLUX (Reliable, unlimited free fallback)
-    webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
-    if webp and jpg: return webp, jpg
-
-    # 4. Hugging Face Router (FLUX.1-schnell)
+    # 3. Hugging Face Router (FLUX.1-schnell)
     webp, jpg = _try_huggingface_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg: return webp, jpg
 
-    # 5. Gemini Flash Image (Backup only to save quota)
+    # 4. Gemini Flash Image (Backup only to save quota)
     webp, jpg = _try_gemini_flash_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg: return webp, jpg
 
-    # 6. Together AI (Optional fallback)
+    # 5. Together AI (Optional fallback)
     webp, jpg = _try_together_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg: return webp, jpg
 
-    # 7. Paid tier only: Gemini Imagen
+    # 6. Paid tier only: Gemini Imagen
     if getattr(config, "USE_GEMINI_IMAGEN", False):
         try:
             prompt = build_image_prompt(article_title)
@@ -701,13 +697,17 @@ def generate_featured_image(article_title, save_dir=None, source_url=None):
         except Exception as e:
             logger.warning(f"    Imagen failed: {e}")
 
+    # 7. Pollinations FLUX (Reliable, unlimited free fallback, last option before placeholder)
+    webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
+    if webp and jpg: return webp, jpg
+
     # 8. Placeholder (Title card)
     logger.info("    Falling back to placeholder title card")
     return _generate_placeholder_image(article_title, output_path_webp, output_path_jpg)
 
 
 def _generate_fallback_image(article_title, output_path_webp, output_path_jpg):
-    """Legacy fallback: try Pollinations then placeholder. Prefer generate_featured_image() which tries Pollinations first."""
+    """Legacy fallback: try Pollinations then placeholder. Prefer generate_featured_image() which tries other APIs first."""
     webp, jpg = _try_pollinations_image(article_title, output_path_webp, output_path_jpg)
     if webp and jpg:
         return webp, jpg
