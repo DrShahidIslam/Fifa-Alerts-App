@@ -22,6 +22,8 @@ WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
 WP_PUBLISH_WEBHOOK_URL = os.getenv("WP_PUBLISH_WEBHOOK_URL", "").strip()
 WP_PUBLISH_SECRET = os.getenv("WP_PUBLISH_SECRET", "").strip()
 
+GITHUB_PAT = os.getenv("GITHUB_PAT")
+
 # â€”â€” RSS Feeds â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 RSS_FEEDS = {
     "ESPN FIFA": "https://www.espn.com/espn/rss/soccer/news",
