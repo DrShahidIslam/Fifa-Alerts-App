@@ -28,43 +28,24 @@ gemini_client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 # Target Repositories
 REPOSITORIES = [
-    "github.com/DrShahidIslam/global-soccer-news.git",
-    "github.com/DrShahidIslam/Fifa-Cloudlfare.git",
-    "github.com/DrShahidIslam/fifaworldcup-vercel.git"
+    {
+        "url": "github.com/DrShahidIslam/global-soccer-news.git",
+        "base_url": "https://drshahidislam.github.io/global-soccer-news",
+        "name": "global-soccer-news"
+    },
+    {
+        "url": "github.com/DrShahidIslam/Fifa-Cloudlfare.git",
+        "base_url": "https://fifa-cloudlfare.pages.dev",
+        "name": "Fifa-Cloudlfare"
+    },
+    {
+        "url": "github.com/DrShahidIslam/fifaworldcup-vercel.git",
+        "base_url": "https://worldcupnews.vercel.app",
+        "name": "fifaworldcup-vercel"
+    }
 ]
 
-# List of matches based on user's structure
-MATCHES = [
-    ("Paraguay", "Playoff Winner C"), ("Canada", "Switzerland"), ("Scotland", "Morocco"),
-    ("Brazil", "Haiti"), ("South Africa", "Playoff Winner D"), ("Mexico", "South Korea"),
-    ("Playoff Winner A", "Qatar"), ("Portugal", "Playoff Winner 1"), ("Uzbekistan", "Colombia"),
-    ("Ghana", "Panama"), ("England", "Croatia"), ("Playoff Winner 2", "Norway"),
-    ("Argentina", "Algeria"), ("Austria", "Jordan"), ("Iran", "New Zealand"),
-    ("Belgium", "Egypt"), ("France", "Senegal"), ("UEFA Playoff B", "Tunisia"),
-    ("Saudi Arabia", "Uruguay"), ("Spain", "Cape Verde"), ("Germany", "Curacao"),
-    ("Netherlands", "Japan"), ("Brazil", "Morocco"), ("Ivory Coast", "Ecuador"),
-    ("Qatar", "Switzerland"), ("USA", "Paraguay"), ("Brazil", "Croatia"),
-    ("Haiti", "Scotland"), ("Australia", "UEFA Playoff C"), ("Mexico", "South Africa"),
-    ("United States", "Japan"), ("Winner Semi 8", "Winner Semi 7"), ("DR Congo", "Winner Semi 1"),
-    ("Iraq", "Winner Semi 2"), ("Winner Semi 6", "Winner Semi 5"), ("Winner Semi 2", "Winner Semi 1"),
-    ("Winner Semi 3", "Winner Semi 4"), ("Czechia", "Republic of Ireland"), ("New Caledonia", "Jamaica"),
-    ("Bolivia", "Suriname"), ("Turkey", "Romania"), ("Slovakia", "Kosovo"),
-    ("Denmark", "North Macedonia"), ("Wales", "Bosnia and Herzegovina"), ("Ukraine", "Sweden"),
-    ("Poland", "Albania"), ("Ghana", "England"), ("Italy", "Northern Ireland"),
-    ("Panama", "Croatia"), ("Playoff Winner 1", "Uzbekistan"), ("Portugal", "Colombia"),
-    ("Norway", "France"), ("Jordan", "Austria"), ("Algeria", "Argentina"),
-    ("Cape Verde", "Uruguay"), ("Saudi Arabia", "Spain"), ("Senegal", "Playoff Winner 2"),
-    ("Tunisia", "Netherlands"), ("New Zealand", "Belgium"), ("Egypt", "Iran"),
-    ("Ecuador", "Curacao"), ("Ivory Coast", "Germany"), ("Japan", "Playoff Winner B"),
-    ("Playoff Winner C", "USA"), ("Paraguay", "Australia"), ("Morocco", "Haiti"),
-    ("Scotland", "Brazil"), ("South Korea", "South Africa"), ("Switzerland", "Canada"),
-    ("England", "Panama"), ("Playoff Winner D", "Mexico"), ("Colombia", "Portugal"),
-    ("Uzbekistan", "Playoff Winner 1"), ("Croatia", "Ghana"), ("France", "Playoff Winner 2"),
-    ("Algeria", "Austria"), ("Argentina", "Jordan"), ("Cape Verde", "Saudi Arabia"),
-    ("Spain", "Uruguay"), ("Norway", "Senegal"), ("New Zealand", "Egypt"),
-    ("Beligum", "Iran"), ("Tunisia", "Japan"), ("Netherlands", "Playoff Winner B"),
-    ("USA", "Australia"), ("Curacao", "Ivory Coast"), ("Germany", "Ecuador")
-]
+# ... [Keep MATCHES list as is] ...
 
 def format_slug(team_name):
     """Convert team name to URL slug format."""
@@ -142,6 +123,75 @@ def run_cmd(cmd, cwd=None):
         raise Exception(f"Command failed: {' '.join(cmd)}")
     return result.stdout
 
+def build_sitemap_and_index(repo_path, base_url):
+    """Generates sitemap.xml and index.html based on all HTML files in es/partidos/"""
+    es_dir = os.path.join(repo_path, "es", "partidos")
+    if not os.path.exists(es_dir):
+        return
+        
+    files = [f for f in os.listdir(es_dir) if f.endswith(".html")]
+    if not files:
+        return
+        
+    urls = []
+    links_html = ""
+    
+    for file in files:
+        url_path = f"{base_url}/es/partidos/{file}"
+        urls.append(url_path)
+        
+        # Read the title from the file
+        file_path = os.path.join(es_dir, file)
+        title = file.replace("-", " ").replace(".html", "").title()
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                title_match = re.search(r"<title>(.*?)</title>", content)
+                if title_match:
+                    title = title_match.group(1)
+        except:
+            pass
+            
+        links_html += f'            <a href="{url_path}" class="match-card"><h3>{title}</h3><p>Ver Pronóstico y Transmisión</p></a>\n'
+
+    # Build sitemap.xml
+    sitemap_content = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for url in urls:
+        sitemap_content += f'  <url>\n    <loc>{url}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n'
+    sitemap_content += '</urlset>'
+    
+    with open(os.path.join(repo_path, "sitemap.xml"), "w", encoding="utf-8") as f:
+        f.write(sitemap_content)
+        
+    # Build index.html
+    index_html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Cup 2026 - Transmisiones y Pronósticos en Vivo</title>
+    <meta name="description" content="Sigue todos los partidos del Mundial 2026. Encuentra transmisiones en vivo, estadísticas y los mejores pronósticos.">
+    <style>
+        body {{ font-family: system-ui, sans-serif; background: #0a0e17; color: white; margin: 0; padding: 2rem; }}
+        h1 {{ text-align: center; color: #f0f4f8; margin-bottom: 3rem; }}
+        .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto; }}
+        .match-card {{ background: rgba(20, 27, 45, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem; text-decoration: none; color: white; display: block; transition: transform 0.2s; }}
+        .match-card:hover {{ transform: translateY(-5px); border-color: #e11d48; }}
+        .match-card h3 {{ margin: 0 0 0.5rem 0; color: #cbd5e1; font-size: 1.1rem; }}
+        .match-card p {{ margin: 0; color: #e11d48; font-weight: bold; font-size: 0.9rem; }}
+    </style>
+</head>
+<body>
+    <h1>Cobertura de Partidos: Mundial 2026</h1>
+    <div class="grid">
+{links_html}
+    </div>
+</body>
+</html>"""
+    
+    with open(os.path.join(repo_path, "index.html"), "w", encoding="utf-8") as f:
+        f.write(index_html)
+
 def deploy_to_repos(html_content, slug, is_dry_run=False):
     pat = config.GITHUB_PAT
     if not pat and not is_dry_run:
@@ -151,13 +201,16 @@ def deploy_to_repos(html_content, slug, is_dry_run=False):
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir)
         
-    for repo in REPOSITORIES:
-        repo_name = repo.split("/")[-1].replace(".git", "")
+    for repo_config in REPOSITORIES:
+        repo_url = repo_config["url"]
+        repo_name = repo_config["name"]
+        base_url = repo_config["base_url"].rstrip("/")
+        
         repo_path = os.path.join(tmp_dir, repo_name)
         
         # Clone or Pull
         if not os.path.exists(repo_path):
-            clone_url = f"https://x-access-token:{pat}@{repo}" if pat else f"https://{repo}"
+            clone_url = f"https://x-access-token:{pat}@{repo_url}" if pat else f"https://{repo_url}"
             logger.info(f"Cloning {repo_name}...")
             run_cmd(["git", "clone", clone_url, repo_path])
         else:
@@ -176,6 +229,10 @@ def deploy_to_repos(html_content, slug, is_dry_run=False):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(html_content)
             
+        # Build Sitemap and Index
+        logger.info(f"Building sitemap and index for {repo_name}...")
+        build_sitemap_and_index(repo_path, base_url)
+            
         if is_dry_run:
             logger.info(f"[DRY RUN] Skipping git commit/push for {repo_name}.")
             continue
@@ -191,7 +248,7 @@ def deploy_to_repos(html_content, slug, is_dry_run=False):
             
         run_cmd(["git", "config", "user.name", "Fifa Agent"], cwd=repo_path)
         run_cmd(["git", "config", "user.email", "agent@fifa-worldcup26.com"], cwd=repo_path)
-        run_cmd(["git", "commit", "-m", f"Auto-publish Spanish preview: {slug}"], cwd=repo_path)
+        run_cmd(["git", "commit", "-m", f"Auto-publish Spanish preview: {slug} & update sitemap"], cwd=repo_path)
         run_cmd(["git", "push"], cwd=repo_path)
         logger.info(f"Successfully pushed to {repo_name}.")
 
