@@ -211,11 +211,15 @@ def build_sitemap_and_index(repo_path, base_url):
         f.write(sitemap_content)
         
     # Build index.html
+    meta_tag = ""
+    if "global-soccer-news" in repo_path:
+        meta_tag = '\n    <meta name="google-site-verification" content="uEI7553rw16YiXFdIpUoK6U56xdBShvXiblGYXHSprw" />'
+        
     index_html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">{meta_tag}
     <title>World Cup 2026 - Transmisiones y Pronósticos en Vivo</title>
     <meta name="description" content="Sigue todos los partidos del Mundial 2026. Encuentra transmisiones en vivo, estadísticas y los mejores pronósticos.">
     <style>
