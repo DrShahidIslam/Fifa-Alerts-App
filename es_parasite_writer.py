@@ -43,7 +43,38 @@ REPOSITORIES = [
     }
 ]
 
-# ... [Keep MATCHES list as is] ...
+# List of matches based on user's structure
+MATCHES = [
+    ("Paraguay", "Playoff Winner C"), ("Canada", "Switzerland"), ("Scotland", "Morocco"),
+    ("Brazil", "Haiti"), ("South Africa", "Playoff Winner D"), ("Mexico", "South Korea"),
+    ("Playoff Winner A", "Qatar"), ("Portugal", "Playoff Winner 1"), ("Uzbekistan", "Colombia"),
+    ("Ghana", "Panama"), ("England", "Croatia"), ("Playoff Winner 2", "Norway"),
+    ("Argentina", "Algeria"), ("Austria", "Jordan"), ("Iran", "New Zealand"),
+    ("Belgium", "Egypt"), ("France", "Senegal"), ("UEFA Playoff B", "Tunisia"),
+    ("Saudi Arabia", "Uruguay"), ("Spain", "Cape Verde"), ("Germany", "Curacao"),
+    ("Netherlands", "Japan"), ("Brazil", "Morocco"), ("Ivory Coast", "Ecuador"),
+    ("Qatar", "Switzerland"), ("USA", "Paraguay"), ("Brazil", "Croatia"),
+    ("Haiti", "Scotland"), ("Australia", "UEFA Playoff C"), ("Mexico", "South Africa"),
+    ("United States", "Japan"), ("Winner Semi 8", "Winner Semi 7"), ("DR Congo", "Winner Semi 1"),
+    ("Iraq", "Winner Semi 2"), ("Winner Semi 6", "Winner Semi 5"), ("Winner Semi 2", "Winner Semi 1"),
+    ("Winner Semi 3", "Winner Semi 4"), ("Czechia", "Republic of Ireland"), ("New Caledonia", "Jamaica"),
+    ("Bolivia", "Suriname"), ("Turkey", "Romania"), ("Slovakia", "Kosovo"),
+    ("Denmark", "North Macedonia"), ("Wales", "Bosnia and Herzegovina"), ("Ukraine", "Sweden"),
+    ("Poland", "Albania"), ("Ghana", "England"), ("Italy", "Northern Ireland"),
+    ("Panama", "Croatia"), ("Playoff Winner 1", "Uzbekistan"), ("Portugal", "Colombia"),
+    ("Norway", "France"), ("Jordan", "Austria"), ("Algeria", "Argentina"),
+    ("Cape Verde", "Uruguay"), ("Saudi Arabia", "Spain"), ("Senegal", "Playoff Winner 2"),
+    ("Tunisia", "Netherlands"), ("New Zealand", "Belgium"), ("Egypt", "Iran"),
+    ("Ecuador", "Curacao"), ("Ivory Coast", "Germany"), ("Japan", "Playoff Winner B"),
+    ("Playoff Winner C", "USA"), ("Paraguay", "Australia"), ("Morocco", "Haiti"),
+    ("Scotland", "Brazil"), ("South Korea", "South Africa"), ("Switzerland", "Canada"),
+    ("England", "Panama"), ("Playoff Winner D", "Mexico"), ("Colombia", "Portugal"),
+    ("Uzbekistan", "Playoff Winner 1"), ("Croatia", "Ghana"), ("France", "Playoff Winner 2"),
+    ("Algeria", "Austria"), ("Argentina", "Jordan"), ("Cape Verde", "Saudi Arabia"),
+    ("Spain", "Uruguay"), ("Norway", "Senegal"), ("New Zealand", "Egypt"),
+    ("Beligum", "Iran"), ("Tunisia", "Japan"), ("Netherlands", "Playoff Winner B"),
+    ("USA", "Australia"), ("Curacao", "Ivory Coast"), ("Germany", "Ecuador")
+]
 
 def format_slug(team_name):
     """Convert team name to URL slug format."""
