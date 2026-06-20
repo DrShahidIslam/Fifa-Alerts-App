@@ -17,14 +17,12 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.dirname(__file__))
 import config
 from writer.es_seo_prompt import build_es_article_prompt
-from google import genai
+from gemini_client import generate_content_with_fallback
 
 # Setup Gemini
-if not config.GEMINI_API_KEY:
-    logger.error("GEMINI_API_KEY is not set in config.")
+if not config.GEMINI_API_KEYS:
+    logger.error("GEMINI_API_KEYS is not set in config.")
     sys.exit(1)
-
-gemini_client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 # Target Repositories
 REPOSITORIES = [
@@ -62,7 +60,7 @@ def fetch_context_for_match(team1, team2):
     logger.info(f"Fetching context for {team1} vs {team2}...")
     try:
         search_prompt = f"Dame un breve resumen de las últimas noticias, estado de forma y jugadores clave para las selecciones de fútbol de {team1} y {team2} de cara a sus próximos partidos internacionales o Copa Mundial."
-        res = gemini_client.models.generate_content(model=config.GEMINI_MODEL, contents=search_prompt)
+        res = generate_content_with_fallback(model=config.GEMINI_MODEL, contents=search_prompt)
         return [{"title": f"Contexto {team1} vs {team2}", "text": res.text, "source_domain": "gemini"}]
     except Exception as e:
         logger.error(f"Failed to fetch context: {e}")
@@ -73,7 +71,7 @@ def generate_article(team1, team2, match_url, context):
     prompt = build_es_article_prompt(match_title, team1, team2, match_url, context)
     
     logger.info("Generating Spanish article via Gemini...")
-    response = gemini_client.models.generate_content(model=config.GEMINI_MODEL, contents=prompt)
+    response = generate_content_with_fallback(model=config.GEMINI_MODEL, contents=prompt)
     
     if not response.text:
         raise ValueError("Gemini returned empty response.")
