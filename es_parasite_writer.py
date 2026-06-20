@@ -86,6 +86,24 @@ def get_match_url(team1, team2):
     slug2 = format_slug(team2)
     return f"https://fifa-worldcup26.com/match/{slug1}-vs-{slug2}/"
 
+def resolve_team_names(team1, team2):
+    """Ask Gemini to resolve placeholder names like 'Playoff Winner C' to actual countries."""
+    if "playoff" not in team1.lower() and "playoff" not in team2.lower() and "winner" not in team1.lower() and "winner" not in team2.lower():
+        return team1, team2
+        
+    prompt = f"In the context of the FIFA World Cup 2026, the scheduled match is '{team1} vs {team2}'. Please resolve any placeholders like 'Playoff Winner' or 'Winner Semi' to the actual country that qualified, or the most highly anticipated country if still unconfirmed. Respond with ONLY the two country names separated by ' vs ' (e.g., 'Paraguay vs Turkey'). Do not add any other text."
+    
+    try:
+        res = generate_content_with_fallback(model=config.GEMINI_MODEL, contents=prompt)
+        resolved_title = res.text.strip().replace("*", "")
+        parts = resolved_title.split(" vs ")
+        if len(parts) == 2:
+            return parts[0].strip(), parts[1].strip()
+    except Exception as e:
+        logger.error(f"Failed to resolve team names: {e}")
+        
+    return team1, team2
+
 def fetch_context_for_match(team1, team2):
     """Fetch recent news context using Gemini search or a generic prompt if search fails."""
     logger.info(f"Fetching context for {team1} vs {team2}...")
@@ -218,7 +236,7 @@ def build_sitemap_and_index(repo_path, base_url):
 </body>
 </html>"""
     
-    with open(os.path.join(repo_path, "index.html"), "w", encoding="utf-8") as f:
+    with open(os.path.join(repo_path, "partidos.html"), "w", encoding="utf-8") as f:
         f.write(index_html)
 
 def deploy_to_repos(html_content, slug, is_dry_run=False):
@@ -303,37 +321,41 @@ def main():
     parser.add_argument("--team2", type=str, help="Force specific Team 2")
     args = parser.parse_args()
 
-    team1 = args.team1
-    team2 = args.team2
+    team1_raw = args.team1
+    team2_raw = args.team2
     processed = []
     tracking_file = ""
 
-    if not team1 or not team2:
-        team1, team2, processed, tracking_file = get_next_match()
-        if not team1:
+    if not team1_raw or not team2_raw:
+        team1_raw, team2_raw, processed, tracking_file = get_next_match()
+        if not team1_raw:
             logger.info("All configured matches have been processed!")
             return
 
-    match_url = get_match_url(team1, team2)
-    logger.info(f"Target Match: {team1} vs {team2}")
+    match_url = get_match_url(team1_raw, team2_raw)
+    
+    # Resolve real team names for the SEO content
+    team1_clean, team2_clean = resolve_team_names(team1_raw, team2_raw)
+    
+    logger.info(f"Target Match: {team1_clean} vs {team2_clean} (Original: {team1_raw} vs {team2_raw})")
     logger.info(f"Backlink URL: {match_url}")
 
     # Fetch context
-    context = fetch_context_for_match(team1, team2)
+    context = fetch_context_for_match(team1_clean, team2_clean)
 
     # Generate content
-    article_data = generate_article(team1, team2, match_url, context)
+    article_data = generate_article(team1_clean, team2_clean, match_url, context)
     logger.info(f"Generated Article: {article_data['title']}")
 
     # Compile HTML
-    html_content = compile_html(article_data, team1, team2)
+    html_content = compile_html(article_data, team1_clean, team2_clean)
 
     # Deploy
     deploy_to_repos(html_content, article_data['slug'], is_dry_run=args.dry_run)
 
     # Mark as processed if not dry run
     if not args.dry_run and tracking_file:
-        match_id = f"{team1}-vs-{team2}".lower()
+        match_id = f"{team1_raw}-vs-{team2_raw}".lower()
         processed.append(match_id)
         with open(tracking_file, "w") as f:
             json.dump(processed, f)
