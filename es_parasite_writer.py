@@ -298,6 +298,17 @@ def deploy_to_repos(html_content, slug, is_dry_run=False):
         run_cmd(["git", "commit", "-m", f"Auto-publish Spanish preview: {slug} & update sitemap"], cwd=repo_path)
         run_cmd(["git", "push"], cwd=repo_path)
         logger.info(f"Successfully pushed to {repo_name}.")
+        
+        # Force Vercel deployment on Hobby Tier
+        if repo_name == "fifaworldcup-vercel":
+            logger.info("Triggering Vercel Deploy Hook...")
+            try:
+                import urllib.request
+                req = urllib.request.Request("https://api.vercel.com/v1/integrations/deploy/prj_nPHHDXlWefTao6IAVPKvQS2SrsON/euNVM3aC15", method="POST")
+                urllib.request.urlopen(req)
+                logger.info("Vercel deployment triggered successfully.")
+            except Exception as e:
+                logger.error(f"Failed to trigger Vercel deployment: {e}")
 
 def get_next_match():
     """Read a local tracking file to find the next match to process."""
